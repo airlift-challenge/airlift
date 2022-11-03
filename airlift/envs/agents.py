@@ -69,7 +69,7 @@ class EnvAgent:
 
         self.malfunction_generator = malfunction_generator
 
-    def _handle_waiting(self, action: dict, cargo_by_id: Dict[CargoID, Cargo], warnings: List[str]) -> None:
+    def _handle_waiting(self, action: dict, cargo_by_id: Dict[CargoID, Cargo], elapsed_time, warnings: List[str]) -> None:
         """
         Handles trnasitions from the waiting state
 
@@ -82,6 +82,7 @@ class EnvAgent:
         if action["process"]:
             success = self.try_to_process([cargo_by_id[id] for id in action["cargo_to_load"]],
                                           [cargo_by_id[id] for id in action["cargo_to_unload"]],
+                                          elapsed_time,
                                           warnings)
             if success:
                 action["process"] = 0
@@ -116,7 +117,7 @@ class EnvAgent:
             self.state = PlaneState.WAITING
             self.elapsed_flight_time = None
 
-    def _handle_ready_for_takeoff(self, action, cargo_by_id: Dict[CargoID, Cargo], warnings: List[str]) -> None:
+    def _handle_ready_for_takeoff(self, action, cargo_by_id: Dict[CargoID, Cargo], elapsed_time, warnings: List[str]) -> None:
         """
         Handles transition when when ready for take off. Checks if routes are reachable from the current airport,
         checks for routes being made unavailable due to malfunctions, gets the flight time and flight cost associated
@@ -132,6 +133,7 @@ class EnvAgent:
         if action["process"]:
             success = self.try_to_process([cargo_by_id[id] for id in action["cargo_to_load"]],
                                           [cargo_by_id[id] for id in action["cargo_to_unload"]],
+                                          elapsed_time,
                                           warnings)
             if success:
                 action["process"] = 0
@@ -140,7 +142,8 @@ class EnvAgent:
         elif action["destination"] != NOAIRPORT_ID:
             new_destination = self.routemap.airports_by_id[action["destination"]]
 
-            if not self.routemap.reachable(self.current_airport, self.routemap.airports_by_id[action["destination"]], self.plane_type):
+            if not self.routemap.reachable(self.current_airport, self.routemap.airports_by_id[action["destination"]],
+                                           self.plane_type):
                 warnings.append("The destination airport is not reachable from here!")
                 action["destination"] = NOAIRPORT_ID
             elif action["destination"] not in self.routemap.get_available_routes(self.current_airport,
@@ -193,7 +196,7 @@ class EnvAgent:
 
         return valid_ids
 
-    def step(self, action, cargo_by_id: Dict[CargoID, Cargo]) -> Tuple[dict, List[str]]:
+    def step(self, action, cargo_by_id: Dict[CargoID, Cargo], elapsed_time) -> Tuple[dict, List[str]]:
         """
         Updates the agent's state.
 
@@ -212,26 +215,26 @@ class EnvAgent:
         """
         self.last_state = self.state
         warnings: List[str] = []
-
         updated_action = action.copy()
         updated_action["cargo_to_load"] = self._check_cargo(updated_action["cargo_to_load"], cargo_by_id, warnings)
         updated_action["cargo_to_unload"] = self._check_cargo(updated_action["cargo_to_unload"], cargo_by_id, warnings)
 
         if self.state == PlaneState.READY_FOR_TAKEOFF:
-            self._handle_ready_for_takeoff(updated_action, cargo_by_id, warnings)
+            self._handle_ready_for_takeoff(updated_action, cargo_by_id, elapsed_time, warnings)
         elif self.state == PlaneState.MOVING:
             self._handle_moving()
         elif self.state == PlaneState.PROCESSING:
             self._handle_processing()
         elif self.state == PlaneState.WAITING:
             self.waiting_steps += 1
-            self._handle_waiting(updated_action, cargo_by_id, warnings)
+            self._handle_waiting(updated_action, cargo_by_id, elapsed_time, warnings)
 
         return updated_action, warnings
 
     def try_to_process(self,
                        cargo_to_load: Collection[Cargo],
                        cargo_to_unload: Collection[Cargo],
+                       elapsed_time,
                        warnings: List[str]) -> bool:
         """
         Checks to see if the current airport has capacity. If there is capacity the agent will go into
@@ -250,7 +253,7 @@ class EnvAgent:
         """
         success = False
         if self.current_airport.airport_has_capacity():
-            self.load_cargo(cargo_to_load, warnings)
+            self.load_cargo(cargo_to_load, elapsed_time, warnings)
             self.unload_cargo(cargo_to_unload, warnings)
 
             self.processing_time_left = self.current_airport.processing_time
@@ -260,7 +263,7 @@ class EnvAgent:
 
         return success
 
-    def load_cargo(self, cargo_to_load: Collection[Cargo], warnings: List[str]):
+    def load_cargo(self, cargo_to_load: Collection[Cargo], elapsed_steps, warnings: List[str]):
         """
         Checks to make sure airplane can load cargo and loads the cargo. Also checks to ensure that cargo is assigned to
         that airplane
@@ -271,10 +274,16 @@ class EnvAgent:
 
         `warnings` : List of warnings issued by the environment. Ex: If an action is given to an unavailable route
         """
+
         for cargo in cargo_to_load:
             if cargo not in self.current_airport.cargo:
                 warnings.append(
                     "Unable to load Cargo ID: " + str(cargo.id) + " is not at airport")
+            elif cargo.earliest_pickup_time > elapsed_steps:
+                time_rem = cargo.earliest_pickup_time - elapsed_steps
+                print(
+                    "Unable to load Cargo ID: " + str(cargo.id) +
+                    ". The cargo is not ready yet and will be ready in " + str(time_rem) + " steps!")
             else:
                 if (cargo.weight + self.current_cargo_weight) <= self.max_loaded_weight:
                     self.current_airport.remove_cargo(cargo)

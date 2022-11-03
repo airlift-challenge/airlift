@@ -12,8 +12,11 @@ CargoID = int
 
 class Cargo:
     """Defines the properties of each single piece of Cargo"""
-    def __init__(self, id, source_airport, end_airport, weight=1, soft_deadline=2 ** 32, hard_deadline=2 ** 32):
+
+    def __init__(self, id, source_airport, end_airport, weight=1, soft_deadline=2 ** 32, hard_deadline=2 ** 32,
+                 earliest_pickup_time=0):
         self.weight: int = weight
+        self.earliest_pickup_time = earliest_pickup_time
         self.id: CargoID = id
         self.soft_deadline = soft_deadline
         self.hard_deadline = hard_deadline
@@ -23,3 +26,6 @@ class Cargo:
         self.reward = 0
         self.missed_softdeadline = False
         self.missed_hardeadline = False
+
+    def is_available(self, elapsed_steps) -> bool:
+        return elapsed_steps >= self.earliest_pickup_time

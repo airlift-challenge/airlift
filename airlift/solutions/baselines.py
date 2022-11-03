@@ -52,7 +52,7 @@ class ShortestPath(Solution):
                 self._full_delivery_paths[c.id] = nx.shortest_path(self.multidigraph, c.location, c.destination, weight="cost")[1:]
 
         # Cargo needing to be delivered that is not assigned yet (sorted to make it deterministic)
-        pending_cargo = [c for c in state["active_cargo"] if c.id not in self.cargo_assignments.values()]
+        pending_cargo = [c for c in state["active_cargo"] if c.id not in self.cargo_assignments.values() and c.is_available == 1]
         actions = {a: None for a in self.agents}
 
         for a in self.agents:

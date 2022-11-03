@@ -1,6 +1,7 @@
 import time
 from gym import logger
 
+from airlift.envs.generators.map_generators import PerlinMapGenerator
 from airlift.envs.plane_types import PlaneType
 from airlift.envs.generators.cargo_generators import DynamicCargoGenerator
 from airlift.envs.airlift_env import AirliftEnv
@@ -8,7 +9,6 @@ from airlift.envs.events.event_interval_generator import EventIntervalGenerator
 from airlift.envs.generators.airplane_generators import AirplaneGenerator
 from airlift.envs.generators.airport_generators import RandomAirportGenerator
 from airlift.envs.generators.route_generators import RouteByDistanceGenerator
-from airlift.envs.generators.map_generators import PerlinMapGenerator
 from airlift.envs.generators.world_generators import AirliftWorldGenerator
 import click
 

@@ -1,6 +1,7 @@
 import functools
 import sys
 from collections import namedtuple
+from datetime import datetime
 from enum import Enum
 from math import floor
 from statistics import mean
@@ -19,7 +20,7 @@ from airlift.envs.cargo import CargoID, Cargo
 from airlift.envs.renderer import EnvRenderer, FlatRenderer, default_height_in_pixels
 from pettingzoo import ParallelEnv
 from airlift.envs.agents import EnvAgent, AgentID, PlaneState
-from gym.spaces import Discrete
+from gym.spaces import Discrete, MultiBinary
 import gym
 import airlift.envs.spaces as airliftspaces
 from airlift.envs.route_map import RouteMap
@@ -88,7 +89,8 @@ class CargoObservation(NamedTuple):
     location: AirportID
     destination: AirportID
     weight: float
-
+    earliest_pickup_time: int
+    is_available: int
 
 class AirliftEnv(ParallelEnv):
     """Controls all aspects of the simulation/environment.
@@ -301,11 +303,12 @@ class AirliftEnv(ParallelEnv):
         self.routemap.step()
 
         # Generate Dynamic Cargo
-        new_cargo = self.world_generator.cargo_generator.generate_dynamic_orders()
+        new_cargo = self.world_generator.cargo_generator.generate_dynamic_orders(self._elapsed_steps)
         self._add_cargo(new_cargo)
 
         for i in self.agents:
             agent = self._agents[i]
+
             # If passed in action is none, continue using last action
             if actions[i] is None:
                 action = self.next_actions[i]
@@ -316,7 +319,7 @@ class AirliftEnv(ParallelEnv):
                 action = ActionHelper.noop_action()
                 EnvLogger.warn_action_out_of_bound(action, self.action_space(i), action)
 
-            updated_action, self.info[i]["warnings"] = agent.step(action, self.cargo_by_id)
+            updated_action, self.info[i]["warnings"] = agent.step(action, self.cargo_by_id, self._elapsed_steps )
             if self.verbose:
                 for warning in self.info[i]["warnings"]:
                     logger.info("Agent {0}: {1}".format(i, warning))
@@ -492,13 +495,14 @@ class AirliftEnv(ParallelEnv):
         total_scaled_cost = 0
         for pt in self.routemap.plane_types:
             G = self.routemap.graph[pt]
-            cost = sum(a.flight_cost for a in self._agents.values() if a.plane_type==pt)
+            cost = sum(a.flight_cost for a in self._agents.values() if a.plane_type == pt)
             cap = sum(a.max_loaded_weight for a in self._agents.values() if a.plane_type == pt)
 
             sccs = list(nx.strongly_connected_components(G))
             subGs = [G.subgraph(nodes).copy() for nodes in sccs]
-            shortestpaths = [{s: {t: nx.shortest_path_length(G, s, t, weight='cost') for t in nodes} for s in nodes} for nodes in sccs]
-            eccentricities =[nx.eccentricity(subG, sp=sp) for subG, sp in zip(subGs, shortestpaths)]
+            shortestpaths = [{s: {t: nx.shortest_path_length(G, s, t, weight='cost') for t in nodes} for s in nodes} for
+                             nodes in sccs]
+            eccentricities = [nx.eccentricity(subG, sp=sp) for subG, sp in zip(subGs, shortestpaths)]
             diameters = [nx.diameter(subG, e=e) for subG, e in zip(subGs, eccentricities)]
             total_diameter = sum(diameters)
             total_scaled_cost += (cost / total_diameter) * (cap / total_cargo_generated)
@@ -512,15 +516,15 @@ class AirliftEnv(ParallelEnv):
             total_steps=self.total_steps_in_episode,
             average_steps=self.total_steps_in_episode / self.world_generator.num_agents,
             total_waiting_steps=sum(item.waiting_steps for item in self._agents.values()),
-            max_seconds_to_complete=600 + 10*(self.total_steps_in_episode-1),
+            max_seconds_to_complete=600 + 10 * (self.total_steps_in_episode - 1),
             total_scaled_cost=total_scaled_cost,
             total_malfunctions=self.routemap.get_total_malfunctions(),
             missed_deliveries=missed_deliveries,
             total_rewards_for_all_agents=sum(self.total_rewards.values()),
             average_rewards_for_all_agents=mean(self.total_rewards.values()),
-            score = self.REWARD_CARGO_MISSED_PENALTY * missed_deliveries \
-                    + self.REWARD_CARGO_LATE_PENALTY * total_scaled_lateness \
-                    + self.REWARD_MOVEMENT_PENALTY * total_scaled_cost,
+            score=self.REWARD_CARGO_MISSED_PENALTY * missed_deliveries \
+                  + self.REWARD_CARGO_LATE_PENALTY * total_scaled_lateness \
+                  + self.REWARD_MOVEMENT_PENALTY * total_scaled_cost,
             total_cargo_generated=total_cargo_generated,
             dynamic_cargo_generated=dynamic_cargo_generated
         )
@@ -591,7 +595,10 @@ class AirliftEnv(ParallelEnv):
                                                             'location': Discrete(self.world_generator.max_airports + 1),
                                                             'destination': Discrete(
                                                                 self.world_generator.max_airports + 1),
-                                                            'weight': Discrete(10000)}),
+                                                            'weight': Discrete(10000),
+                                                            'earliest_pickup_time': Discrete(100000),
+                                                            'is_available': Discrete(2)
+                                                            }),
                 # Cannot be NOAIRPORT_ID
                 self.world_generator.max_cargo_per_episode),
             "plane_types": airliftspaces.List(
@@ -630,13 +637,13 @@ class AirliftEnv(ParallelEnv):
         if self.num_resets == 0:
             EnvLogger.error_state_before_reset()
 
-        self._state["active_cargo"] = [CargoObservation(c.id, self._get_cargo_location_ids(c), c.end_airport.id, c.weight)
-                                       for c in self.cargo
-                                       if not self.cargo_done(c)]
+        self._state["active_cargo"] = [
+            CargoObservation(c.id, self._get_cargo_location_ids(c), c.end_airport.id, c.weight, c.earliest_pickup_time, c.is_available(self._elapsed_steps))
+            for c in self.cargo
+            if not self.cargo_done(c)]
 
-        if TEST_MODE:
-            assert self.state_space().contains(self._state)
-
+       # if TEST_MODE:
+           # assert self.state_space().contains(self._state)
         return self._state
 
     @property
@@ -711,9 +718,9 @@ class AirliftEnv(ParallelEnv):
         sp = gym.spaces.Dict({
             "process": Discrete(2),
             "cargo_to_load": airliftspaces.List(Discrete(self._largest_cargo_id),
-                                               self.max_cargo_on_airplane),
+                                                self.max_cargo_on_airplane),
             "cargo_to_unload": airliftspaces.List(Discrete(self._largest_cargo_id),
-                                                 self.max_cargo_on_airplane),
+                                                  self.max_cargo_on_airplane),
             "destination": gym.spaces.Discrete(self.world_generator.max_airports + 1)
         })
 
@@ -742,6 +749,7 @@ class AirliftEnv(ParallelEnv):
 class ActionHelper:
     """Assists policies in making actions for loading, unloading, processing, No-Op or taking off. Also includes a
     sample valid action function that is utilized for the Random Agent"""
+
     def __init__(self, np_random=seeding.np_random()[0]):
         self._np_random = np_random
         self._randcache = []
@@ -758,7 +766,7 @@ class ActionHelper:
     # Choose an element from seq uniformly at random
     def _choice(self, seq):
         r = self._rand()
-        i = floor(r * (len(seq)-sys.float_info.epsilon))
+        i = floor(r * (len(seq) - sys.float_info.epsilon))
         return seq[i]
 
     # Choose a subset of the cargo uniformly at random
@@ -767,7 +775,7 @@ class ActionHelper:
         # See "List" sample code in spaces.py for more info - this implementation should be equivalent
         cargo.sort()
         val = [c for c in cargo if self._rand() > 0.5]
-        #print(val)
+        # print(val)
         return val
 
     def sample_valid_actions(self, observation):
@@ -780,8 +788,6 @@ class ActionHelper:
                           "cargo_to_unload": self._sample_cargo(obs["cargo_onboard"]),
                           "destination": self._choice([NOAIRPORT_ID] + list(obs["available_routes"]))}
         return actions
-
-
 
     @staticmethod
     def load_action(cargo_to_load) -> dict:
@@ -930,6 +936,7 @@ class ActionHelper:
 
 class ObservationHelper:
     """Helper class for using the state and observation. All methods are static methods."""
+
     def __init__(self):
         self.obs_warnings = self.ObservationWarnings()
 

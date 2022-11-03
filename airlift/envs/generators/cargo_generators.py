@@ -40,7 +40,7 @@ class CargoGenerator:
     def generate_initial_orders(self) -> set:
         raise NotImplementedError
 
-    def generate_dynamic_orders(self) -> List[Cargo]:
+    def generate_dynamic_orders(self, elapsed_steps) -> List[Cargo]:
         return []
 
     def will_generate_more_cargo(self):
@@ -82,11 +82,11 @@ class StaticCargoGenerator(CargoGenerator):
         return {self.generate_cargo_order(i, self.routemap.drop_off_airports, self.routemap.pick_up_airports) for i in
                 range(self.num_initial_tasks)}
 
-    def generate_dynamic_orders(self) -> List[Cargo]:
+    def generate_dynamic_orders(self, elapsed_steps) -> List[Cargo]:
         return []
 
     def generate_cargo_order(self, cargo_id, drop_off_airports: OrderedSet[Airport],
-                             pickup_airports: OrderedSet[Airport]) -> Cargo:
+                             pickup_airports: OrderedSet[Airport], time_available=0) -> Cargo:
         """
         Generates cargo orders based on several parameters. Takes into account if we are running a scenario with a
         concentrated drop off or pick up location as well as non-concentrated locations that utilize the entire map.
@@ -108,14 +108,14 @@ class StaticCargoGenerator(CargoGenerator):
 
         destination_airport = self._np_random.choice(drop_off_airports)
         source_airport = self._np_random.choice(pickup_airports - {destination_airport})
-
         soft_deadline, hard_deadline = self.create_schedule(source_airport, destination_airport)
         cargo_task = Cargo(cargo_id,
                            source_airport,
                            destination_airport,
                            generate_cargo_weight(),
                            soft_deadline,
-                           hard_deadline)
+                           hard_deadline,
+                           earliest_pickup_time=time_available)
         source_airport.add_cargo(cargo_task)
         return cargo_task
 
@@ -168,7 +168,7 @@ class DynamicCargoGenerator(StaticCargoGenerator):
         self.max_cargo_per_episode = max_cargo_to_create + num_initial_tasks
         self.eventgen = EventGenerator(self.cargo_creation_rate)
 
-    def generate_dynamic_orders(self) -> List[Cargo]:
+    def generate_dynamic_orders(self, elapsed_steps) -> List[Cargo]:
         """
         The EventGenerator controls whether a new dynamic cargo is generated or not using poisson distribution. Makes sure that
         the upperbound limit of max cargo generated per episode is also adhered to.
@@ -181,7 +181,8 @@ class DynamicCargoGenerator(StaticCargoGenerator):
                 self.current_cargo_count < self.max_cargo_per_episode:
             cargo_task = self.generate_cargo_order(self.current_cargo_count,
                                                    self.routemap.drop_off_airports,
-                                                   self.routemap.pick_up_airports)
+                                                   self.routemap.pick_up_airports,
+                                                   time_available=elapsed_steps)
             self.current_cargo_count += 1
             logger.info("Cargo Generated " + "Current " + str(self.current_cargo_count) + " Max: " + str(
                 self.max_cargo_per_episode))
@@ -198,6 +199,68 @@ class DynamicCargoGenerator(StaticCargoGenerator):
         self.eventgen.seed(seed=generate_seed(self._np_random))
 
 
+class EarliestPickupCargoGenerator(StaticCargoGenerator):
+
+    def __init__(self, num_of_tasks=1, soft_deadline_multiplier=1, hard_deadline_multiplier=1.5, time_step_interval=1,
+                 min_range=0, max_range=15000):
+        super().__init__(num_of_tasks=num_of_tasks,
+                         soft_deadline_multiplier=soft_deadline_multiplier,
+                         hard_deadline_multiplier=hard_deadline_multiplier)
+
+        self.time_table = []
+        self._processing_time = None
+        self._graph = None
+        self.soft_deadline_multiplier = soft_deadline_multiplier
+        self.hard_deadline_multiplier = hard_deadline_multiplier
+        self.avg_hops = None
+        self.avg_flighttime = None
+
+        # Create a list of intervals
+        self.time_step_interval = time_step_interval
+        self.max_range = max_range
+        self.min_range = min_range
+
+    def create_discrete_timetable(self, start, end, time_step_interval):
+        current = start
+        while current < end:
+            yield current
+            current += self._np_random.choice(time_step_interval)
+
+    def populate_time_table(self):
+        self.time_table = [num for num in
+                           self.create_discrete_timetable(self.min_range, self.max_range,
+                                                          self.time_step_interval)]
+        self.time_table.reverse()
+
+    def reset(self, routemap):
+        super().reset(routemap)
+
+    def seed(self, seed=None):
+        super().seed(seed)
+
+    def generate_cargo_order(self, cargo_id, drop_off_airports: OrderedSet[Airport],
+                             pickup_airports: OrderedSet[Airport], time_available=0) -> Cargo:
+
+        # Populate time table for cargo availability
+        if not self.time_table:
+            self.populate_time_table()
+
+        time_available = self.time_table.pop()
+        destination_airport = self._np_random.choice(drop_off_airports)
+        source_airport = self._np_random.choice(pickup_airports - {destination_airport})
+        soft_deadline, hard_deadline = self.create_schedule(source_airport, destination_airport)
+        cargo_task = Cargo(cargo_id,
+                           source_airport,
+                           destination_airport,
+                           generate_cargo_weight(),
+                           # Add time_available to the deadlines
+                           soft_deadline+time_available,
+                           hard_deadline+time_available,
+                           earliest_pickup_time=time_available)
+        source_airport.add_cargo(cargo_task)
+        return cargo_task
+
+
 class CargoInfo(NamedTuple):
     """Primarily used in testing purposes for the hard coded cargo generator. Properties resemble that of the Cargo class"""
     id: CargoID
@@ -206,6 +269,7 @@ class CargoInfo(NamedTuple):
     weight: float = 1
     soft_deadline: int = 2 ** 32
     hard_deadline: int = 2 ** 32
+    time_available: int = 0
 
 
 class HardcodedCargoGenerator(CargoGenerator):
@@ -233,7 +297,8 @@ class HardcodedCargoGenerator(CargoGenerator):
                               self.routemap.airports_by_id[c.end_airport_id],
                               c.weight,
                               c.soft_deadline,
-                              c.hard_deadline)
+                              c.hard_deadline,
+                              c.time_available)
                         for c in self._initialcargoinfo]
 
         for cargo in initialcargo:
