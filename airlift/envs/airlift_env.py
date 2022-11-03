@@ -636,10 +636,10 @@ class AirliftEnv(ParallelEnv):
 
         if self.num_resets == 0:
             EnvLogger.error_state_before_reset()
-
+        cargo_sorted = sorted(self.cargo, key=lambda cargo: cargo.id)
         self._state["active_cargo"] = [
             CargoObservation(c.id, self._get_cargo_location_ids(c), c.end_airport.id, c.weight, c.earliest_pickup_time, c.is_available(self._elapsed_steps))
-            for c in self.cargo
+            for c in cargo_sorted
             if not self.cargo_done(c)]
 
        # if TEST_MODE:
