@@ -7,7 +7,7 @@ from gym import logger
 from airlift.envs.airport import AirportID
 from airlift.envs.agents import EnvAgent
 from airlift.envs.route_map import RouteMap
-from airlift.envs.spaces import NamedTuple
+from typing import NamedTuple
 
 
 class AirplaneInfo(NamedTuple):
