@@ -1,9 +1,9 @@
 import itertools
+import os
 from datetime import datetime
 from typing import List
 
 import PIL.ImageDraw
-import cv2
 import numpy as np
 import pyglet as pgl
 from PIL import Image
@@ -228,6 +228,8 @@ class FlatRenderer(EnvRenderer):
         return img
 
     def render_to_video(self):
+        import cv2
+
         if self.widthPx is None:
             self._update_size_in_pixels()
         if not self._initialized:
@@ -238,7 +240,12 @@ class FlatRenderer(EnvRenderer):
             self.frame_size = (self.widthPx, self.heightPx)
             self.fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
             #self.fourcc = cv2.VideoWriter_fourcc('L', 'A', 'G', 'S')
-            self.out = cv2.VideoWriter(ROOT_DIR + "/recordings/" + dt_string + ".wmv", self.fourcc, 12.0,
+            path = ROOT_DIR + "/recordings/" + dt_string + ".wmv"
+            path_exists = os.path.exists(path)
+            if not path_exists:
+                os.makedirs(path)
+
+            self.out = cv2.VideoWriter(path, self.fourcc, 12.0,
                                        self.frame_size)
         airport_layer = self._create_layer()
         self._place_airports(airport_layer)
