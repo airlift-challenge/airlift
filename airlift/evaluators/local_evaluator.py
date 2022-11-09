@@ -9,13 +9,13 @@ import random
 import time
 import json
 import re
-from enum import Enum
+from enum import IntEnum
 from networkx.readwrite import json_graph
 import numpy as np
 from airlift.envs import AirliftEnv
 from airlift.utils.running_stats import RunningStat
 
-class Status(Enum):
+class Status(IntEnum):
     SUCCESSFUL_CREATION = 0
     STOPPED_TOO_MANY_MISSED = 1
     FINISHED_ALL_SCENARIOS = 2
@@ -184,11 +184,14 @@ class LocalEvaluationService:
             self.simulation_steps.append(0)
 
             self.current_step = 0
-            _observation = self._env.reset(self.seeds[self.simulation_count])
+            _observation = self._env.reset(seed = self.seeds[self.simulation_count])
 
             self.status = Status.SUCCESSFUL_CREATION
 
         return _observation, None, self.status
+
+    def get_done_status(self):
+        return all(self._env.dones.values())
 
     def env_step(self, command):
         """ Handles a ENV_STEP command from the client

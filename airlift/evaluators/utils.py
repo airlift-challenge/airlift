@@ -17,7 +17,7 @@ from airlift.solutions.baselines import RandomAgent, ShortestPath
 
 def doeval(test_folder: Path,
            solution: Solution,
-           start_solution_seed: int=123):
+           start_solution_seed: int = 123):
     evaluator = LocalEvaluationService(test_env_folder=str(test_folder))
 
     solution_seed = start_solution_seed
@@ -48,11 +48,10 @@ def doeval(test_folder: Path,
 
         solution_seed += 1
 
-    #if status == Status.FINISHED_ALL_SCENARIOS:
+    # if status == Status.FINISHED_ALL_SCENARIOS:
     print("Evaluation Complete...")
     print(evaluator.submit())
     evaluator.print_stats()
-
 
 
 class ScenarioInfo(NamedTuple):
@@ -82,20 +81,24 @@ def _get_solution_info(solution_env, solution_name, solution_seed):
             solution_env.metrics.total_scaled_cost,
             solution_env.metrics.total_scaled_lateness]
 
-def generate_scenarios(output_path, scenarios: List[ScenarioInfo], multiprocess=False, num_processes=multiprocessing.cpu_count() - 1, run_random=True, run_baseline=True):
+
+def generate_scenarios(output_path, scenarios: List[ScenarioInfo], multiprocess=False,
+                       num_processes=multiprocessing.cpu_count() - 1, run_random=True, run_baseline=True,
+                       base_env_seed=44, base_solution_seed=33):
     output_path.mkdir(parents=True, exist_ok=True)
 
     if list(output_path.glob('*')):
         warnings.warn("Output folder is not empty")
 
-    base_env_seed = 44
-    base_solution_seed = 33
+    base_env_seed = base_env_seed
+    base_solution_seed = base_solution_seed
 
     if multiprocess:
         from joblib import Parallel, delayed
         results = Parallel(n_jobs=num_processes) \
-                          (delayed(generate_scenario)(scenario, output_path, base_env_seed+i, base_solution_seed+i, run_random=run_random, run_baseline=run_baseline)
-                           for i, scenario in enumerate(scenarios))
+            (delayed(generate_scenario)(scenario, output_path, base_env_seed + i, base_solution_seed + i,
+                                        run_random=run_random, run_baseline=run_baseline)
+             for i, scenario in enumerate(scenarios))
         headers, rows = zip(*results)
 
         # Make sure metadata is properly sorted.
@@ -116,13 +119,15 @@ def generate_scenarios(output_path, scenarios: List[ScenarioInfo], multiprocess=
         with open(output_path / "metadata.csv", 'w', newline='') as metadatafile:
             csvwriter = csv.writer(metadatafile)
             for i, scenario in enumerate(scenarios):
-                header, row = generate_scenario(scenario, output_path, base_env_seed+i, base_solution_seed+i, run_random=run_random, run_baseline=run_baseline)
+                header, row = generate_scenario(scenario, output_path, base_env_seed + i, base_solution_seed + i,
+                                                run_random=run_random, run_baseline=run_baseline)
                 if row is not None:
                     if i == 0:
                         csvwriter.writerow(header)
                     csvwriter.writerow(row)
 
     print("Done!")
+
 
 def generate_scenario(scenario, output_path, env_seed, solution_seed, run_random=True, run_baseline=True):
     testnum = scenario.testnum
@@ -150,7 +155,7 @@ def generate_scenario(scenario, output_path, env_seed, solution_seed, run_random
                   render=False,
                   env_seed=env_seed,
                   solution_seed=solution_seed)
-        assert(all(randomenv.dones.values()))
+        assert (all(randomenv.dones.values()))
         random_fields, random_values = _get_solution_info(randomenv, "random", solution_seed)
     else:
         random_fields = []
@@ -164,7 +169,7 @@ def generate_scenario(scenario, output_path, env_seed, solution_seed, run_random
                   render=False,
                   env_seed=env_seed,
                   solution_seed=solution_seed)
-        assert(all(baselineenv.dones.values()))
+        assert (all(baselineenv.dones.values()))
         baseline_fields, baseline_values = _get_solution_info(baselineenv, "baseline", solution_seed)
     else:
         baseline_fields = []
@@ -182,15 +187,15 @@ def generate_scenario(scenario, output_path, env_seed, solution_seed, run_random
                   "level_id",
                   "filename",
                   "seed"] \
-                   + list(env_info._fields) \
-                   + list(random_fields) \
-                   + list(baseline_fields)
+                 + list(env_info._fields) \
+                 + list(random_fields) \
+                 + list(baseline_fields)
         data = [scenario.testnum,
                 scenario.levelnum,
                 test_folder + "/" + level_filename,
                 env_seed] \
-                + list(env_info) \
-                + list(random_values) \
-                + list(baseline_values)
+               + list(env_info) \
+               + list(random_values) \
+               + list(baseline_values)
 
         return header, data
