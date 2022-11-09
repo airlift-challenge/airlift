@@ -216,7 +216,8 @@ class AirliftEnv(ParallelEnv):
         # Fill in the state graph which we return in the observation
         # We maintain this to avoid performance hit on building the dictionary
         self._state = {"route_map": {},
-                       "plane_types": [PlaneTypeObservation(pt.id, pt.max_weight) for pt in self.routemap.plane_types]}
+                       "plane_types": [PlaneTypeObservation(pt.id, pt.max_weight) for pt in self.routemap.plane_types],
+                       "agents": {a: {} for a in self.agents}}
 
         for plane in self.routemap.plane_types:
             self._state["route_map"][plane.id] = nx.DiGraph(self.routemap.graph[plane])
@@ -239,8 +240,7 @@ class AirliftEnv(ParallelEnv):
             self._state_graph_cache[plane.id] = edges
 
         self._obs = {a: {} for a in self.agents}
-        self._update_state()
-        self._update_obs()
+        self._update_state_and_obs(new_cargo=[])
 
         self.max_cycles = self.world_generator.max_cycles
         return self.observe()
@@ -385,8 +385,7 @@ class AirliftEnv(ParallelEnv):
         for k in self.total_rewards.keys():
             self.total_rewards[k] += self.rewards.get(k, 0)  # Default to 0 reward if agent is done
 
-        self._update_state()
-        self._update_obs()
+        self._update_state_and_obs(new_cargo)
 
         # PettingZoo interface says an agent should be removed from the agents list once it's done
         for i, d in self.dones.items():
@@ -579,35 +578,57 @@ class AirliftEnv(ParallelEnv):
         # In these cases, we will default the value to 1, to avoid Discrete(0) in the spaces (since this is not allowed).
         return max(self.world_generator.max_cargo_per_episode, 1)
 
+    def _agent_space(self):
+        return gym.spaces.Dict({
+            "state": gym.spaces.Discrete(max(s.value for s in PlaneState) + 1),
+            "current_airport": gym.spaces.Discrete(self.world_generator.max_airports + 1),
+            "cargo_onboard": airliftspaces.List(Discrete(self._largest_cargo_id),
+                                                self.max_cargo_on_airplane),
+            "current_weight": Discrete(10000),
+            "plane_type": gym.spaces.Discrete(len(self.world_generator.plane_types)),
+            "max_weight": Discrete(10000),
+            "cargo_at_current_airport": airliftspaces.List(Discrete(self._largest_cargo_id),
+                                                           self.max_cargo_on_airplane),
+            "available_routes": airliftspaces.List(Discrete(self.world_generator.max_airports + 1),
+                                                   self.world_generator.max_airports),
+            "next_action": self.action_space(self.agents[0]),
+            "destination": gym.spaces.Discrete(self.world_generator.max_airports + 1)
+        })
+
     @functools.lru_cache(maxsize=None)  # Ensures that we always return the same space (not a copy)
     def state_space(self) -> Space:
         route_map = gym.spaces.Dict({})
-
         for plane in self.world_generator.plane_types:
             route_map[plane.id] = airliftspaces.DiGraph(self.world_generator.max_airports + 1,
                                                         ["cost", "time", "route_available"])
 
         assert min(s.value for s in PlaneState) >= 0  # Make sure the enum will fit into a Discrete space
-        return gym.spaces.Dict({
-            "route_map": route_map,
-            "active_cargo": airliftspaces.List(
-                airliftspaces.NamedTuple(CargoObservation, {'id': Discrete(self._largest_cargo_id),
+
+        cargo_info_space = airliftspaces.NamedTuple(CargoObservation, {'id': Discrete(self._largest_cargo_id),
                                                             'location': Discrete(self.world_generator.max_airports + 1),
                                                             'destination': Discrete(
                                                                 self.world_generator.max_airports + 1),
                                                             'weight': Discrete(10000),
                                                             'earliest_pickup_time': Discrete(100000),
                                                             'is_available': Discrete(2)
-                                                            }),
-                # Cannot be NOAIRPORT_ID
-                self.world_generator.max_cargo_per_episode),
+                                                            })
+        return gym.spaces.Dict({
+            "route_map": route_map,
+            "active_cargo": airliftspaces.List(cargo_info_space, self.world_generator.max_cargo_per_episode),
             "plane_types": airliftspaces.List(
                 airliftspaces.NamedTuple(PlaneTypeObservation, {'id': Discrete(len(self.world_generator.plane_types)),
                                                                 'max_weight': Discrete(10000)}),
-                len(self.world_generator.plane_types))
+                len(self.world_generator.plane_types)),
+            "event_new_cargo": airliftspaces.List(cargo_info_space, self.world_generator.max_cargo_per_episode),
+            "agents": gym.spaces.Dict({a: self._agent_space() for a in self.possible_agents})
         })
 
     def state(self):
+        """
+        Returns the complete state of the environment.
+        """
+        if self.num_resets == 0:
+            EnvLogger.error_state_before_reset()
         return self._state
 
     def _get_cargo_location_ids(self, cargo) -> Tuple[AirportID]:
@@ -628,24 +649,6 @@ class AirliftEnv(ParallelEnv):
 
         return NOAIRPORT_ID
 
-    def _update_state(self):
-        for plane in self.routemap.plane_types:
-            for u, v, data_routemap, data_state in self._state_graph_cache[plane.id]:
-                data_state['mal'] = data_routemap['mal'].malfunction_down_counter
-                data_state['route_available'] = not data_routemap['mal'].in_malfunction
-
-        if self.num_resets == 0:
-            EnvLogger.error_state_before_reset()
-        cargo_sorted = sorted(self.cargo, key=lambda cargo: cargo.id)
-        self._state["active_cargo"] = [
-            CargoObservation(c.id, self._get_cargo_location_ids(c), c.end_airport.id, c.weight, c.earliest_pickup_time, c.is_available(self._elapsed_steps))
-            for c in cargo_sorted
-            if not self.cargo_done(c)]
-
-       # if TEST_MODE:
-           # assert self.state_space().contains(self._state)
-        return self._state
-
     @property
     def max_cargo_on_airplane(self):
         return self.world_generator.cargo_generator.max_cargo_per_episode
@@ -655,20 +658,8 @@ class AirliftEnv(ParallelEnv):
     def observation_spaces(self) -> Dict[AgentID, Space]:
         # Note: All agents have the same observation space
         assert min(s.value for s in PlaneState) >= 0  # Make sure the enum will fit into a Discrete space
-        sp = gym.spaces.Dict({
-            "state": gym.spaces.Discrete(max(s.value for s in PlaneState) + 1),
-            "current_airport": gym.spaces.Discrete(self.world_generator.max_airports + 1),
-            # If NOAIRPORT_ID, means plane is in transit
-            "cargo_onboard": airliftspaces.List(Discrete(self._largest_cargo_id),
-                                                self.max_cargo_on_airplane),
-            "plane_type": gym.spaces.Discrete(len(self.world_generator.plane_types)),
-            "cargo_at_current_airport": airliftspaces.List(Discrete(self._largest_cargo_id),
-                                                           self.max_cargo_on_airplane),
-            "available_routes": airliftspaces.List(Discrete(self.world_generator.max_airports + 1),
-                                                   self.world_generator.max_airports),
-            "globalstate": self.state_space(),
-            "next_action": self.action_space(self.agents[0])
-        })
+        sp = self._agent_space()
+        sp["globalstate"] = self.state_space()
 
         return {a: sp for a in self.agents}
 
@@ -678,39 +669,65 @@ class AirliftEnv(ParallelEnv):
 
     #  Not required for ParallelEnv, but including it for convenience
     def observe(self, agent: AgentID = None):
+        if self.num_resets == 0:
+            EnvLogger.error_observe_before_reset()
+
         if agent is None:
             return self._obs
         else:
             return self._obs[agent]
 
-    def _update_obs(self):
-        if self.num_resets == 0:
-            EnvLogger.error_observe_before_reset()
+    def _build_cargo_obs(self, cargo: Cargo):
+        return CargoObservation(
+                         cargo.id,
+                         self._get_cargo_location_ids(cargo),
+                         cargo.end_airport.id,
+                         cargo.weight,
+                         cargo.earliest_pickup_time,
+                         cargo.is_available(self._elapsed_steps))
+
+    def _update_state_and_obs(self, new_cargo):
+        for plane in self.routemap.plane_types:
+            for u, v, data_routemap, data_state in self._state_graph_cache[plane.id]:
+                data_state['mal'] = data_routemap['mal'].malfunction_down_counter
+                data_state['route_available'] = not data_routemap['mal'].in_malfunction
+
+        self._state["active_cargo"] = [self._build_cargo_obs(c) for c in self.cargo if not self.cargo_done(c)]
+        self._state["event_new_cargo"] = [self._build_cargo_obs(c) for c in new_cargo]
 
         for agent in self.agents:
             agentobj = self._agents[agent]
-            obs = self._obs[agent]
+            agentstate = self._state["agents"][agent]
 
-            obs["cargo_onboard"] = [c.id for c in agentobj.cargo]
-            obs["state"] = agentobj.state
-            obs["plane_type"] = agentobj.plane_type.id
-            obs["available_routes"] = self.routemap.get_available_routes(agentobj.current_airport, agentobj.plane_type)
+            agentstate["cargo_onboard"] = [c.id for c in agentobj.cargo]
+            agentstate["state"] = agentobj.state
 
-            # obs['warnings'] = frozenset()
-            obs['globalstate'] = self.state()
+            agentstate["plane_type"] = agentobj.plane_type.id
+            agentstate["current_weight"] = sum(c.weight for c in agentobj.cargo)
+            agentstate["max_weight"] = agentobj.plane_type.max_weight
 
-            obs['next_action'] = self.next_actions[agent]
+            agentstate["available_routes"] = self.routemap.get_available_routes(agentobj.current_airport, agentobj.plane_type)
+
+            agentstate['next_action'] = self.next_actions[agent]
 
             if agentobj.state == PlaneState.MOVING:
-                # We can't set these to None - we need to put some value even though their meaningless while airplane is in flight
-                obs["current_airport"] = agentobj.current_airport.id
-                obs["cargo_at_current_airport"] = []
+                # We can't set these to None - we need to put some value even though they're meaningless while airplane is in flight
+                agentstate["current_airport"] = agentobj.current_airport.id
+                agentstate["cargo_at_current_airport"] = []
+                agentstate["destination"] = agentobj.destination_airport.id if agentobj.destination_airport is not None else NOAIRPORT_ID
             else:
-                obs["current_airport"] = agentobj.current_airport.id
-                obs["cargo_at_current_airport"] = [c.id for c in agentobj.current_airport.cargo]
+                agentstate["current_airport"] = agentobj.current_airport.id
+                agentstate["cargo_at_current_airport"] = [c.id for c in agentobj.current_airport.cargo]
+                agentstate["destination"] = agentobj.destination_airport.id if agentobj.destination_airport is not None else NOAIRPORT_ID
 
-            if TEST_MODE:
-                assert self.observation_space(agent).contains(obs)
+            # Update the observation using the agent's values in the state
+            self._obs[agent].update(agentstate)
+            self._obs[agent]["globalstate"] = self._state
+
+        if TEST_MODE:
+            assert self.state_space().contains(self._state)
+            for agent in self.agents:
+                assert self.observation_space(agent).contains(self._obs[agent])
 
     @property
     @functools.lru_cache(maxsize=None)
@@ -1010,6 +1027,13 @@ class ObservationHelper:
             return cargo_infos[0]
         else:
             return None
+
+    @classmethod
+    def get_cargo_weight(cls, state, cargo_list):
+        # TODO: If an airplane has cargo onboard that becomes "inactive", we can't get the cargo weight from the observation.
+        #       For now we just ignore that cargo. This could lead to incorrect results.
+        cargo_infos = [cls.get_active_cargo_info(state, c) for c in cargo_list]
+        return sum(ci.weight for ci in cargo_infos if ci is not None)
 
     @staticmethod
     def get_multidigraph(state) -> nx.MultiDiGraph():
