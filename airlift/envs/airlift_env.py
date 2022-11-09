@@ -194,7 +194,8 @@ class AirliftEnv(ParallelEnv):
         self.routemap, airplanes, cargo = self.world_generator.generate()
         self.renderer.reset(self.routemap, airplanes)
         self.cargo_by_id = {}
-        self._add_cargo(cargo)
+        cargo_sorted = sorted(cargo, key=lambda c: c.id)
+        self._add_cargo(cargo_sorted)
 
         assert len(airplanes) == len(self.possible_agents)
         self._agents = {i: a for i, a in zip(self.possible_agents, airplanes)}
@@ -793,9 +794,9 @@ class ActionHelper:
     def _sample_cargo(self, cargo):
         # Flip a coin to decide whether to include each cargo item
         # See "List" sample code in spaces.py for more info - this implementation should be equivalent
-        cargo.sort()
+        if cargo is not None:
+            cargo.sort()
         val = [c for c in cargo if self._rand() > 0.5]
-        # print(val)
         return val
 
     def sample_valid_actions(self, observation):
