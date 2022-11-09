@@ -264,7 +264,7 @@ class RandomAirportGenerator(AirportGenerator):
             self.num_pick_up_airports = 0
 
         self.aspect_ratio = aspect_ratio
-
+        self.mapgen = mapgen
     def _grid_to_coord(self, map: FlatMap, gridxy: Tuple[int, int]) -> FlatCoordinate:
         x = gridxy[0] * map.width / map.grid_size[0]
         y = gridxy[1] * map.height / map.grid_size[1]
@@ -341,12 +341,10 @@ class RandomAirportGenerator(AirportGenerator):
                 trycounter += 1
                 if trycounter > 10000:
                     break
-
         airports = self._generate_airports_from_coords(airport_coords, dropoff_area, pick_up_area)
 
         if len(airports) < self.max_airports:
             warnings.warn(f"Could not set all required airports! Created {len(airports)}/{self.max_airports}")
-
         return airports, map, dropoff_area, pick_up_area
 
 

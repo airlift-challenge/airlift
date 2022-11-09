@@ -11,6 +11,7 @@ from PIL.Image import Image
 class Coordinate:
     pass
 
+
 class FlatCoordinate(Coordinate, Tuple[float, float]):
     def __add__(self, other):
         return self.__class__((self[0] + other[0],
@@ -50,10 +51,10 @@ class FlatArea:
         raise NotImplementedError
 
     def _get_grid_bound_box(self, height, width, grid_size, box_width, box_height):
-        row_start = max(int((self.center[1] - box_height/2) * grid_size[1] / height), 0)
-        row_end = min(int((self.center[1] + box_height/2) * grid_size[1] / height), grid_size[1])
-        col_start = max(int((self.center[0] - box_width/2) * grid_size[0] / width), 0)
-        col_end = min(int((self.center[0] + box_width/2) * grid_size[0] / width), grid_size[0])
+        row_start = max(int((self.center[1] - box_height / 2) * grid_size[1] / height), 0)
+        row_end = min(int((self.center[1] + box_height / 2) * grid_size[1] / height), grid_size[1])
+        col_start = max(int((self.center[0] - box_width / 2) * grid_size[0] / width), 0)
+        col_end = min(int((self.center[0] + box_width / 2) * grid_size[0] / width), grid_size[0])
 
         return row_start, row_end, col_start, col_end
 
@@ -70,15 +71,16 @@ class FlatRectangle(FlatArea):
         return (self.width, self.height)
 
     def is_in_area(self, coord: FlatCoordinate):
-        return (self.center[0] - self.width/2) <= coord[0] <= (self.center[0] + self.width/2) and \
-               (self.center[1] - self.height/2) <= coord[1] <= (self.center[1] + self.height/2)
+        return (self.center[0] - self.width / 2) <= coord[0] <= (self.center[0] + self.width / 2) and \
+               (self.center[1] - self.height / 2) <= coord[1] <= (self.center[1] + self.height / 2)
 
     def get_area(self):
         return self.height * self.width
 
     @lru_cache
     def get_grid_mask(self, height, width, grid_size):
-        row_start, row_end, col_start, col_end = self._get_grid_bound_box(height, width, grid_size, self.width, self.height)
+        row_start, row_end, col_start, col_end = self._get_grid_bound_box(height, width, grid_size, self.width,
+                                                                          self.height)
         mask = np.zeros((grid_size[1], grid_size[0]))
         mask[row_start: row_end, col_start: col_end] = 1.0
 
@@ -93,7 +95,7 @@ class FlatCircle(FlatArea):
 
     @property
     def size(self) -> Tuple[float, float]:
-        return (2*self.radius, 2*self.radius)
+        return (2 * self.radius, 2 * self.radius)
 
     def is_in_area(self, coord: FlatCoordinate):
         return FlatMap.distance(self.center, coord) <= self.radius
@@ -103,7 +105,8 @@ class FlatCircle(FlatArea):
 
     @lru_cache
     def get_grid_mask(self, height, width, grid_size):
-        row_start, row_end, col_start, col_end = self._get_grid_bound_box(height, width, grid_size, 2*self.radius, 2*self.radius)
+        row_start, row_end, col_start, col_end = self._get_grid_bound_box(height, width, grid_size, 2 * self.radius,
+                                                                          2 * self.radius)
 
         mask = np.zeros((grid_size[1], grid_size[0]))
         for i in range(row_start, row_end):
@@ -166,7 +169,6 @@ class FlatMap(Map):
         else:
             self.grid_size = grid_size
 
-
     def _coord_to_pixel(self, coord: FlatCoordinate) -> Tuple[int, int]:
         xpixel = round(self.grid_size[0] * coord[0] / self.width)
         ypixel = round(self.grid_size[1] * coord[1] / self.height)
@@ -225,6 +227,7 @@ class FlatMap(Map):
         norm_direction = unnorm_direction / np.linalg.norm(unnorm_direction)
         return FlatCoordinate((norm_direction[0], norm_direction[1]))
 
+
 class FlatLandOnlyMap(FlatMap):
     def __init__(self, height, width, grid_size):
         super().__init__(height,
@@ -239,8 +242,8 @@ class FlatLandOnlyMap(FlatMap):
 
 
 class FlatLandWaterMap(FlatMap):
-    WATER_COLOR = [0, 0, 139] # Dark Blue
-    LAND_COLOR = [34, 139, 34] # Dark Green
+    WATER_COLOR = [0, 0, 139]  # Dark Blue
+    LAND_COLOR = [34, 139, 34]  # Dark Green
 
     def __init__(self, height, width, land_water_map):
         super().__init__(height,
@@ -263,7 +266,6 @@ class FlatLandWaterMap(FlatMap):
         #             area_total += 1
         #             if self.image.getpixel((xpixel, ypixel)) == tuple(self.LAND_COLOR):
         #                 land_total += 1
-
         return sum(sum((mask == 1.0) & (self.land_water_map == 1.0))) / sum(sum(mask == 1.0))
 
     def _add_color(self, land_water_map: npt.ArrayLike) -> npt.ArrayLike:
@@ -285,3 +287,22 @@ class FlatLandWaterMap(FlatMap):
                 else:
                     color_world[i][j] = self.WATER_COLOR
         return color_world
+
+
+class FlatRealLandWaterMap(FlatMap):
+    WATER_COLOR = [0, 0, 139]  # Dark Blue
+    LAND_COLOR = [34, 139, 34]  # Dark Green
+
+    def __init__(self, height, width, land_water_map):
+        self.land_water_map = land_water_map
+
+        super().__init__(height,
+                         width,
+                         image=PIL.Image.fromarray(land_water_map))
+
+    def is_land(self, coord: FlatCoordinate):
+        return self.image.getpixel(self._coord_to_pixel(coord)) == tuple(self.LAND_COLOR)
+
+    def land_coverage(self, area: FlatArea) -> float:
+        return 1.0
+

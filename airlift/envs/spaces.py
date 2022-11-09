@@ -48,7 +48,7 @@ class List(Space[typing.List]):
         )
 
     def __repr__(self):
-        return f"Set({self.space},{self.maxsize})"
+        return f"List({self.space},{self.maxsize})"
 
     def __len__(self):
         return self.maxsize

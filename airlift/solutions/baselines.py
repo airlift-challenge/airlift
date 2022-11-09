@@ -57,6 +57,7 @@ class ShortestPath(Solution):
 
         for a in self.agents:
             # If the agent is done, stop issuing actions for it
+
             if dones[a]:
                 continue
 

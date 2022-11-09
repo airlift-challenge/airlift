@@ -12,7 +12,6 @@ from PIL.Image import Image
 from gym import logger, Space
 from gym.utils import seeding
 from pettingzoo.utils.env_logger import EnvLogger
-from ordered_set import OrderedSet
 
 from airlift.envs.plane_types import PlaneTypeID
 from airlift.envs.airport import NOAIRPORT_ID, AirportID
