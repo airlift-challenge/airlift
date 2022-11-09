@@ -292,6 +292,11 @@ class AirliftEnv(ParallelEnv):
         if actions is None:
             actions = {a: None for a in self.agents}
 
+        if TEST_MODE:
+            action_valid = ActionHelper.are_actions_valid(actions, self.observe())[0]
+            if not action_valid:
+                logger.warn("Invalid action(s) given")
+
         self.clear_rewards_dict()
         self._elapsed_steps += 1
         self.available_capacity += self.calculate_available_capacity()
@@ -319,12 +324,10 @@ class AirliftEnv(ParallelEnv):
                 action = ActionHelper.noop_action()
                 EnvLogger.warn_action_out_of_bound(action, self.action_space(i), action)
 
-            updated_action, self.info[i]["warnings"] = agent.step(action, self.cargo_by_id, self._elapsed_steps )
+            updated_action, self.info[i]["warnings"] = agent.step(action, self.cargo_by_id, self._elapsed_steps)
             if self.verbose:
                 for warning in self.info[i]["warnings"]:
                     logger.info("Agent {0}: {1}".format(i, warning))
-
-            # action_valid = ActionHelper.is_action_valid(self.next_actions[i], obs, agent)
 
             self.next_actions[i] = updated_action
 
@@ -902,51 +905,50 @@ class ActionHelper:
         return not action["process"] and \
                action["destination"] == NOAIRPORT_ID
 
+    @classmethod
+    def are_actions_valid(cls, actions, obs):
+        valid_dict = {}
+        warnings_dict = {}
+        for a in actions.keys():
+            valid_dict[a], warnings_dict[a] = cls.is_action_valid(actions[a], obs[a])
+
+        return all(valid_dict.values()), warnings_dict
+
     @staticmethod
-    def is_action_valid(agent_action, obs, agent):
+    def is_action_valid(agent_action, agent_obs):
+        state = agent_obs["globalstate"]
+
         warnings_list = []
         action_valid = True
 
-        def check_process():
+        if agent_action is None:
+            pass
+        else:
             if agent_action["process"] not in [0, 1]:
                 warnings_list.append(ObservationHelper.ObservationWarnings.PROCESS_OUT_OF_BOUNDS)
 
-        def check_destination():
             if agent_action["destination"] not in (
-                    [NOAIRPORT_ID] + list(obs["available_routes"]) + list(obs['disabled_routes'])):
-                warnings_list.append(ObservationHelper.ObservationWarnings.ROUTE_OUT_OF_BOUNDS)
+                    [NOAIRPORT_ID] + agent_obs["available_routes"]):
+                warnings_list.append(ObservationHelper.ObservationWarnings.ROUTE_UNAVAILABLE)
 
-        def check_route_disabled():
-            if agent_action['destination'] in list(obs['disabled_routes']):
-                warnings_list.append(ObservationHelper.ObservationWarnings.ROUTE_DISABLED)
+            max_airports = len(state["route_map"][agent_obs["plane_type"]].nodes)
+            if agent_action["destination"] > max_airports:
+                warnings_list.append(ObservationHelper.ObservationWarnings.AIRPORT_OUT_OF_BOUNDS)
 
-        def check_cargo_to_unload():
-            if agent_action['cargo_to_unload'] not in list(obs["cargo_onboard"]) and len(
-                    agent_action['cargo_to_unload']) != 0:
+            if any(c not in agent_obs['cargo_onboard'] for c in agent_action['cargo_to_unload']):
                 warnings_list.append(ObservationHelper.ObservationWarnings.ATTEMPTING_TO_UNLOAD_CARGO_NOT_ONBOARD)
 
-        def check_cargo_to_load():
-            if agent_action['cargo_to_load'] not in list(obs["cargo_at_current_airport"]) and len(
-                    agent_action['cargo_to_load']) != 0:
+            if any(c not in agent_obs['cargo_at_current_airport'] for c in agent_action['cargo_to_load']):
                 warnings_list.append(ObservationHelper.ObservationWarnings.ATTEMPTING_TO_LOAD_CARGO_NOT_AT_AIRPORT)
 
-        def check_cargo_load_weight():
-            if agent.current_cargo_weight >= agent.max_loaded_weight:
+            weight_to_load = ObservationHelper.get_cargo_weight(state, agent_action["cargo_to_load"])
+            weight_to_unload = ObservationHelper.get_cargo_weight(state, agent_action["cargo_to_unload"])
+            if agent_obs["current_weight"] + weight_to_load - weight_to_unload > agent_obs["max_weight"]:
                 warnings_list.append(ObservationHelper.ObservationWarnings.AGENT_MAX_WEIGHT_EXCEEDED)
-
-        check_process()
-        check_destination()
-        check_route_disabled()
-        check_cargo_to_unload()
-        check_cargo_to_load()
-        check_cargo_load_weight()
-
-        obs['warnings'] = warnings_list
 
         if warnings_list:
             action_valid = False
-
-        return action_valid
+        return action_valid, warnings_list
 
 
 # Helper functions for using the state and observations
@@ -1052,9 +1054,10 @@ class ObservationHelper:
 
     class ObservationWarnings(Enum):
         ROUTE_DISABLED = 1
-        ROUTE_OUT_OF_BOUNDS = 2
+        ROUTE_UNAVAILABLE = 2
         UNABLE_TO_LOAD_CARGO = 3
         ATTEMPTING_TO_UNLOAD_CARGO_NOT_ONBOARD = 4
         ATTEMPTING_TO_LOAD_CARGO_NOT_AT_AIRPORT = 5
         PROCESS_OUT_OF_BOUNDS = 6
         AGENT_MAX_WEIGHT_EXCEEDED = 7
+        AIRPORT_OUT_OF_BOUNDS = 8
