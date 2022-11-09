@@ -15,19 +15,18 @@ class PlaneState(IntEnum):
     """
     Enumeration that defines the states an agent can be in
 
-        - :0: Waiting
-        - :1: Processing
-        - :2: Stopped
-        - :3: Moving
-        - :4: Ready for takeoff
+        - :0: Waiting - airplane is waiting to process at an airport
+        - :1: Processing - airplane is refueling and loading/unloading cargo
+        - :2: Moving - Airplane is in flight to its destination
+        - :3: Ready for takeoff - airplane is ready for takeoff once it is given a destination
     """
 
     # Docstring may seem redundant here, but its mainly for the apidocs
     WAITING = 0
     PROCESSING = 1
-    STOPPED = 2
-    MOVING = 3
-    READY_FOR_TAKEOFF = 4
+    MOVING = 2
+    READY_FOR_TAKEOFF = 3
+
 
 
 class EnvAgent:
