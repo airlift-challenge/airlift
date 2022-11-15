@@ -417,8 +417,7 @@ class AirliftEnv(ParallelEnv):
         return cargo.delivery_time is not None
 
     def cargo_missed(self, cargo):
-        return not self.cargo_delivered(cargo) and self._elapsed_steps > cargo.hard_deadline or \
-               not self.cargo_delivered(cargo) and self._elapsed_steps == self.max_cycles
+        return not self.cargo_delivered(cargo) and self._elapsed_steps > cargo.hard_deadline
 
     def cargo_done(self, cargo):
         assert not (self.cargo_delivered(cargo) and self.cargo_missed(cargo))
