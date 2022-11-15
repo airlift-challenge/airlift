@@ -489,10 +489,7 @@ class AirliftEnv(ParallelEnv):
 
         dynamic_cargo_generated = self.world_generator.cargo_generator.current_cargo_count - self.world_generator.cargo_generator.num_initial_tasks
         total_cargo_generated = self.world_generator.cargo_generator.num_initial_tasks + dynamic_cargo_generated
-        # Accounting for reaching max cycles without generating all required cargo
-        if self._elapsed_steps >= self.max_cycles:
-            total_missed_due_to_max_cycles = total_cargo_generated - len(self.cargo)
-            missed_deliveries += total_missed_due_to_max_cycles
+        assert total_cargo_generated == len(self.cargo)
 
         total_scaled_cost = 0
         for pt in self.routemap.plane_types:
