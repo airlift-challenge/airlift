@@ -2,7 +2,7 @@ import gym
 import numpy as np
 
 from airlift.envs.generators.cargo_generators import StaticCargoGenerator
-from tests.util import generate_environment
+from airlift.tests.util import generate_environment
 from gym import logger
 
 logger.set_level(logger.WARN)

@@ -3,7 +3,7 @@ from gym.utils import seeding
 from airlift.envs.generators.cargo_generators import StaticCargoGenerator
 from airlift.envs.events.event_interval_generator import EventIntervalGenerator
 from airlift.envs.events.malfunction_handler import MalfunctionHandler
-from tests.util import generate_environment
+from airlift.tests.util import generate_environment
 from gym import logger
 from airlift.solutions.baselines import RandomAgent
 logger.set_level(logger.WARN)

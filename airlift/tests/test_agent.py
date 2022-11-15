@@ -12,7 +12,7 @@ from airlift.envs import PlaneState
 
 # To run (--render is optional):
 # pytest unit_tests/test_agent.py --render
-from tests.util import generate_environment
+from airlift.tests.util import generate_environment
 
 
 @pytest.fixture

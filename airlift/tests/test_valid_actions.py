@@ -2,7 +2,7 @@ import numpy as np
 from gym.utils import seeding
 from airlift.envs.events.event_interval_generator import NoEventIntervalGen
 from airlift.envs import ActionHelper, ObservationHelper as oh
-from tests.util import generate_environment
+from airlift.tests.util import generate_environment
 from gym import logger
 
 logger.set_level(logger.WARN)

@@ -8,7 +8,7 @@ from pettingzoo.test import api_test, max_cycles_test, render_test, performance_
 from pettingzoo.test.seed_test import parallel_seed_test
 from pettingzoo.test.parallel_test import parallel_api_test
 
-from tests.util import generate_environment
+from airlift.tests.util import generate_environment
 
 
 # To run (--render is optional):

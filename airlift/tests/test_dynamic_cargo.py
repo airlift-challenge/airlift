@@ -1,6 +1,6 @@
 from gym.utils import seeding
 from airlift.envs.generators.cargo_generators import DynamicCargoGenerator
-from tests.util import generate_environment
+from airlift.tests.util import generate_environment
 from gym import logger
 
 logger.set_level(logger.WARN)
