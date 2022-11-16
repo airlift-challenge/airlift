@@ -1,5 +1,6 @@
 import csv
 import os
+import traceback
 import warnings
 from operator import itemgetter
 from typing import NamedTuple, Callable, List
@@ -99,7 +100,15 @@ def generate_scenarios(output_path, scenarios: List[ScenarioInfo], multiprocess=
             (delayed(generate_scenario)(scenario, output_path, base_env_seed + i, base_solution_seed + i,
                                         run_random=run_random, run_baseline=run_baseline)
              for i, scenario in enumerate(scenarios))
-        headers, rows = zip(*results)
+        headers, raw_rows = zip(*results)
+
+        # Filter out "None" rows, i.e., rows which encountered an exception
+        rows = []
+        for i, row in enumerate(raw_rows):
+            if row is None:
+                warnings.warn("Missing results for row {0}".format(i))
+            else:
+                rows.append(row)
 
         # Make sure metadata is properly sorted.
         # Assume test and level are first two fields!
@@ -108,10 +117,11 @@ def generate_scenarios(output_path, scenarios: List[ScenarioInfo], multiprocess=
         print("Writing metadata")
         with open(output_path / "metadata.csv", 'w', newline='') as metadatafile:
             csvwriter = csv.writer(metadatafile)
+
+            assert headers[0] is not None  # This could happen if first scenario generator fails
             csvwriter.writerow(headers[0])
             for row in rows:
-                if row is not None:
-                    csvwriter.writerow(row)
+                csvwriter.writerow(row)
     else:
         print("Writing metadata")
 
@@ -121,81 +131,93 @@ def generate_scenarios(output_path, scenarios: List[ScenarioInfo], multiprocess=
             for i, scenario in enumerate(scenarios):
                 header, row = generate_scenario(scenario, output_path, base_env_seed + i, base_solution_seed + i,
                                                 run_random=run_random, run_baseline=run_baseline)
-                if row is not None:
-                    if i == 0:
-                        csvwriter.writerow(header)
+                if i == 0:
+                    assert header is not None # This could happen if first scenario generator fails
+                    csvwriter.writerow(header)
+                if row is None:
+                    warnings.warn("Missing results for row {0}".format(i))
+                else:
                     csvwriter.writerow(row)
 
     print("Done!")
 
 
 def generate_scenario(scenario, output_path, env_seed, solution_seed, run_random=True, run_baseline=True):
-    testnum = scenario.testnum
-    levelnum = scenario.levelnum
-    env = scenario.env
+    try:
+        testnum = scenario.testnum
+        levelnum = scenario.levelnum
+        env = scenario.env
 
-    test_folder = "Test_{}".format(testnum)
-    level_filename = "Level_{}.pkl".format(levelnum)
-    test_path = output_path / test_folder
-    test_path.mkdir(exist_ok=True)
-    level_file = test_path / level_filename
+        test_folder = "Test_{}".format(testnum)
+        level_filename = "Level_{}.pkl".format(levelnum)
+        test_path = output_path / test_folder
+        test_path.mkdir(exist_ok=True)
+        level_file = test_path / level_filename
 
-    print("Start Generating {}".format(level_file))
-    env.save(level_file)
+        print("Start Generating {}".format(level_file))
+        env.save(level_file)
 
-    env.reset(env_seed)
-    env_info = env.env_info
+        env.reset(env_seed)
+        env_info = env.env_info
 
-    # Generate random score
-    # Let's reload the environment to make sure it's exactly what the evaluator will evaluate against
-    if run_random:
-        randomenv = AirliftEnv.load(level_file)
-        doepisode(randomenv,
-                  solution=RandomAgent(),
-                  render=False,
-                  env_seed=env_seed,
-                  solution_seed=solution_seed)
-        assert (all(randomenv.dones.values()))
-        random_fields, random_values = _get_solution_info(randomenv, "random", solution_seed)
-    else:
-        random_fields = []
-        random_values = []
+        # # For testing purposes
+        # if scenario.testnum > 0:
+        #     raise Exception("Testing failure")
 
-    # Generate baseline score
-    if run_baseline:
-        baselineenv = AirliftEnv.load(level_file)
-        doepisode(baselineenv,
-                  solution=ShortestPath(),
-                  render=False,
-                  env_seed=env_seed,
-                  solution_seed=solution_seed)
-        assert (all(baselineenv.dones.values()))
-        baseline_fields, baseline_values = _get_solution_info(baselineenv, "baseline", solution_seed)
-    else:
-        baseline_fields = []
-        baseline_values = []
+        # Generate random score
+        # Let's reload the environment to make sure it's exactly what the evaluator will evaluate against
+        if run_random:
+            randomenv = AirliftEnv.load(level_file)
+            doepisode(randomenv,
+                      solution=RandomAgent(),
+                      render=False,
+                      env_seed=env_seed,
+                      solution_seed=solution_seed)
+            assert (all(randomenv.dones.values()))
+            random_fields, random_values = _get_solution_info(randomenv, "random", solution_seed)
+        else:
+            random_fields = []
+            random_values = []
 
-    print("Done Generating {}".format(level_file))
+        # Generate baseline score
+        if run_baseline:
+            baselineenv = AirliftEnv.load(level_file)
+            doepisode(baselineenv,
+                      solution=ShortestPath(),
+                      render=False,
+                      env_seed=env_seed,
+                      solution_seed=solution_seed)
+            assert (all(baselineenv.dones.values()))
+            baseline_fields, baseline_values = _get_solution_info(baselineenv, "baseline", solution_seed)
+        else:
+            baseline_fields = []
+            baseline_values = []
 
-    # if run_baselines and randomenv.metrics.score <= baselineenv.metrics.score:
-    #     warnings.warn("Random solution did as well or better than baseline solutions - omitting from metadata")
-    #     os.remove(level_file)
-    #     return None, None
-    # else:
-    if True:
-        header = ["test_id",
-                  "level_id",
-                  "filename",
-                  "seed"] \
-                 + list(env_info._fields) \
-                 + list(random_fields) \
-                 + list(baseline_fields)
-        data = [scenario.testnum,
-                scenario.levelnum,
-                test_folder + "/" + level_filename,
-                env_seed] \
-               + list(env_info) \
-               + list(random_values) \
-               + list(baseline_values)
+        print("Done Generating {}".format(level_file))
 
-        return header, data
+        # if run_baselines and randomenv.metrics.score <= baselineenv.metrics.score:
+        #     warnings.warn("Random solution did as well or better than baseline solutions - omitting from metadata")
+        #     os.remove(level_file)
+        #     return None, None
+        # else:
+        if True:
+            header = ["test_id",
+                      "level_id",
+                      "filename",
+                      "seed"] \
+                     + list(env_info._fields) \
+                     + list(random_fields) \
+                     + list(baseline_fields)
+            data = [scenario.testnum,
+                    scenario.levelnum,
+                    test_folder + "/" + level_filename,
+                    env_seed] \
+                   + list(env_info) \
+                   + list(random_values) \
+                   + list(baseline_values)
+
+            return header, data
+    except:
+        warnings.warn("Exception processing test {0} level {1}".format(scenario.testnum, scenario.levelnum))
+        traceback.print_exc()
+        return None, None
