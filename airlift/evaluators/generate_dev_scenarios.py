@@ -29,9 +29,7 @@ from pathlib import Path
                 help="Run random algorithm to get score")
 @click.option('--run-baseline/--no-run-baseline', is_flag=True, show_default=True, default=True,
                 help="Run baseline algorithm to get score")
-def create_scenarios_based_on_test_level(output_path=Path(ROOT_DIR + "/scenarios/"),
-                                         run_random=True,
-                                         run_baseline=True):
+def create_scenarios_based_on_test_level(output_path, run_random, run_baseline):
     multiprocess = True
 
     # Initialize start values...
