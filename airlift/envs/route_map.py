@@ -19,7 +19,8 @@ class RouteMap:
     as well as any malfunctions that may occur.
     """
 
-    def __init__(self, map: Map, airports: List[Airport], plane_types: Collection[PlaneType] = None, drop_off_area=None, pick_up_area=None):
+    def __init__(self, map: Map, airports: List[Airport], plane_types: Collection[PlaneType] = None, drop_off_area=None,
+                 pick_up_area=None):
         self.map = map
         self.graph: Dict[PlaneType, nx.DiGraph] = {}
 
@@ -52,8 +53,6 @@ class RouteMap:
 
         self._malfunction_handlers = []
 
-
-
     def __repr__(self):
         return "Graph Data | Distance: " + " | Airplane Type: " + str(self.plane_types) + \
                " | Graph Information: " + str(self.graph) + " | Memory Address: " + hex(id(self))
@@ -64,7 +63,7 @@ class RouteMap:
     @staticmethod
     def build_multigraph(graph_dict) -> nx.MultiDiGraph():
         G = nx.MultiDiGraph()
-        for k, digraph in graph_dict.items(): # Note that keys can be any data type
+        for k, digraph in graph_dict.items():  # Note that keys can be any data type
             for node, d in digraph.nodes(data=True):
                 if node not in G.nodes:
                     G.add_node(node, **d)
@@ -88,7 +87,6 @@ class RouteMap:
             self.graph[plane] = nx.DiGraph()
 
         self._multigraph = None
-
 
     def add_vertices(self) -> None:
         """
@@ -140,6 +138,9 @@ class RouteMap:
 
         self._multigraph = None
 
+        assert (self.get_flight_cost(start, end, plane) > 0)
+        assert (self.get_flight_time(start, end, plane) > 0)
+
     def draw_graph(self, plane_type_ids_to_draw=None) -> None:
         import matplotlib.pyplot as plt
         EDGECOLORS = ['b', 'r', 'g']
@@ -163,7 +164,8 @@ class RouteMap:
 
             nx.draw_networkx_edge_labels(self.graph[plane], pos, edge_labels=graph_edge_labels,
                                          label_pos=0.5, font_size=7)
-            nx.draw(self.graph[plane], pos, with_labels=True, edge_color=EDGECOLORS[plane.id], style=EDGESTYLES[plane.id])
+            nx.draw(self.graph[plane], pos, with_labels=True, edge_color=EDGECOLORS[plane.id],
+                    style=EDGESTYLES[plane.id])
             # position = nx.get_edge_attributes(self._graph[plane.model], "time")
 
         # Change origin to top left
@@ -277,5 +279,3 @@ class RouteMap:
         """
         routes = self.graph[plane_type].adj[source.id]
         return [dest for dest, d in routes.items() if not d['mal'].in_malfunction]
-
-
