@@ -40,6 +40,7 @@ def check_reward(env, a):
 
 # Assumes action doesn't involve movement
 def do_single_agent_action(env, agent, action, interimstate, donestate, render):
+    ah.is_action_valid(action, env.observe(agent))[0] # We don't assert this, since routes may be unavailable in some cases...
     env.step({agent: action})
     check_reward(env, agent)
 
