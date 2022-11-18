@@ -88,7 +88,7 @@ class LocalEvaluationService:
 
         self.episode_step_time_stat = RunningStat()
 
-        file = open(self.output_dir + "breakdown_results.csv", "w")
+        file = open(self.output_dir + "breakdown_results_" + str(submission_id) + ".csv", "w")
         data = "Filename, Episode Score, Episode Score Normalized, Percentage Cargo Missed," \
                "Total Cost, Average Cost Per Plane, Total Lateness, Average Lateness Per Plane, " \
                "Total Steps, Average Steps, Total Waiting Steps, Total Time To Complete, Total Malfunctions, " \
@@ -248,7 +248,7 @@ class LocalEvaluationService:
                 (self.random_scores[self.simulation_count] - self._env.metrics.score) \
                 / (self.random_scores[self.simulation_count] - self.baseline_scores[self.simulation_count])
 
-            file = open(self.output_dir + "breakdown_results.csv", "a")
+            file = open(self.output_dir + "breakdown_results_" + str(self.submission_id) + ".csv", "a")
             data = str(self.env_filenames[self.simulation_count]) + "," \
                    + str(self.simulation_scores[self.simulation_count]) \
                    + "," + str(self.simulation_scores_normalized[self.simulation_count]) \
@@ -340,7 +340,7 @@ class LocalEvaluationService:
         mean_normalized_score = round(mean_normalized_score, 5)
         mean_percentage_missed = round(mean_percentage_missed, 3)
 
-        file = open(self.output_dir + "results_summary.csv", "w")
+        file = open(self.output_dir + "results_summary_" + str(self.submission_id) + ".csv", "w")
         data = "Mean Evaluation Score, Sum Evaluation Score, Mean Evaluation Score Normalized, Mean Evaluation Percentage Missed Deliveries, Sum of Normalized Evaluation Score, Num Tests Completed \n"
         data += str(mean_score) + "," + str(sum_score) + "," + str(mean_normalized_score) + "," + str(mean_percentage_missed) + "," + str(sum_normalized_score) + "," + str(self.num_tests_completed)
         file.write(data)
