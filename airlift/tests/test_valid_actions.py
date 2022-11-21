@@ -1,7 +1,7 @@
 import numpy as np
 from gym.utils import seeding
 from airlift.envs.events.event_interval_generator import NoEventIntervalGen
-from airlift.envs import ActionHelper, ObservationHelper as oh
+from airlift.envs import ActionHelper, ObservationHelper as oh, StaticCargoGenerator, NOAIRPORT_ID
 from airlift.tests.util import generate_environment
 from gym import logger
 
@@ -11,23 +11,21 @@ logger.set_level(logger.WARN)
 def test_legal_actions(render):
     seed = 546435
     np_random, seed = seeding.np_random(seed)
-    num_airports = 4
-    env = generate_environment(num_of_airports=num_airports, num_of_agents=1,
-                               malfunction_generator=NoEventIntervalGen())
-    env.reset(seed)
-    obs = env.observe()
-
-    valid_destination(env, num_airports, obs)
-    valid_process(env, num_airports, obs)
-    load_cargo(env, num_airports)
-
-
-# unload_cargo(env, num_airports) # Having some issues with this one, i'm probably doing something wrong in the loop.
+    num_airports = 5
+    env = generate_environment(num_of_airports=num_airports, num_of_agents=1, processing_time=0,
+                               malfunction_generator=NoEventIntervalGen(),
+                               cargo_generator=StaticCargoGenerator(1, soft_deadline_multiplier=1000,
+                                                                    hard_deadline_multiplier=2000))
+    obs = env.reset(seed)
+    valid_destination(env, obs)
+    valid_process(env, obs)
+    load_cargo(env)
+    unload_cargo(env)
 
 
-def valid_process(env, num_airports, obs):
-    # Not a fully connected graph, no malfunctions, check to see if we can get to node 4..
-    actions = {'a_0': {'process': 5, 'cargo_to_load': set(), 'cargo_to_unload': set(), 'destination': 3}}
+def valid_process(env, obs):
+    route = 4
+    actions = {'a_0': {'process': 5, 'cargo_to_load': set(), 'cargo_to_unload': set(), 'destination': route}}
     action_legal, warnings_list = ActionHelper.are_actions_valid(actions, obs)
     env.step(actions)
     assert not action_legal
@@ -35,16 +33,20 @@ def valid_process(env, num_airports, obs):
     # Check the valid process [0,1]
     process = [0, 1]
     for i in range(len(process)):
-        actions = {'a_0': {'process': process[i], 'cargo_to_load': set(), 'cargo_to_unload': set(), 'destination': 3}}
+        actions = {
+            'a_0': {'process': process[i], 'cargo_to_load': set(), 'cargo_to_unload': set(), 'destination': route}}
         action_legal, warnings_list = ActionHelper.are_actions_valid(actions, obs)
         assert action_legal
 
 
-def valid_destination(env, num_airports, obs):
+def valid_destination(env, obs):
     # Not a fully connected graph, no malfunctions, check to see if we can get to node 4..
-    actions = {'a_0': {'process': 1, 'cargo_to_load': set(), 'cargo_to_unload': set(), 'destination': 3}}
+    available_routes = obs['a_0']['available_routes']
+    route = np.random.choice(available_routes)
+    actions = {'a_0': {'process': 0, 'cargo_to_load': set(), 'cargo_to_unload': set(), 'destination': route}}
     action_legal, warnings_list = ActionHelper.are_actions_valid(actions, obs)
     env.step(actions)
+
     obs = env.observe()
     assert action_legal
 
@@ -64,7 +66,7 @@ def valid_destination(env, num_airports, obs):
         assert action_legal
 
     # Go through a list of unavailable routes/out of bounds
-    available_routes = [4, 6, 7, 8, 10]
+    available_routes = [30, 60, 70, 80, 100]
     while available_routes:
         actions = {'a_0': {'process': 0, 'cargo_to_load': set(), 'cargo_to_unload': set(),
                            'destination': np.random.choice(available_routes)}}
@@ -73,68 +75,105 @@ def valid_destination(env, num_airports, obs):
         assert not action_legal
 
 
-def load_cargo(env, num_airports):
-    obs = env.observe()
+def load_cargo(env):
+    # Test real cargo we can load
+    observation = env.observe()
     cargo_info = oh.get_active_cargo_info(env.state(), 0)
-    print(cargo_info)
+    actions = {a: None for a in env.agents}
 
-    # Load some random cargo..
-    actions = {'a_0': {'process': 0, 'cargo_to_load': [50], 'cargo_to_unload': set(), 'destination': 3}}
-    action_legal, warnings_list = ActionHelper.are_actions_valid(actions, obs)
-    obs = env.observe()
-    assert not action_legal
+    # Reach cargo location, load cargo
+    while observation['a_0']['current_airport'] is not cargo_info.location or not observation['a_0']['cargo_onboard']:
+        for a in observation:
+            obs = observation[a]
+            actions[a] = {"process": 0,
+                          "cargo_to_load": [],
+                          "cargo_to_unload": [],
+                          "destination": NOAIRPORT_ID}
 
-    while obs['a_0']['current_airport'] is not cargo_info.location:
-        obs = env.observe()
-        routes_available = obs['a_0']['available_routes']
-        destination = np.random.choice(routes_available)
-        actions = {'a_0': {'process': 1, 'cargo_to_load': set(), 'cargo_to_unload': set(), 'destination': destination}}
-        action_legal, warnings_list = ActionHelper.are_actions_valid(actions, obs)
+            if obs['current_airport'] is cargo_info.location:
+                actions[a]["process"] = 1
+                actions[a]["cargo_to_load"].append(cargo_info.id)
+                actions[a]['destination'] = NOAIRPORT_ID
+                action_legal, warnings_list = ActionHelper.are_actions_valid(actions, observation)
+                obs, rewards, dones, _ = env.step(actions)
+                assert action_legal
+            else:
+                action_legal, warnings_list = ActionHelper.are_actions_valid(actions, observation)
+                actions[a]['destination'] = cargo_info.location
+                assert action_legal
+
+        # Step ahead a bit to account for processing time, currently set to 0 but still need +1 step.
+        actions = {a: None for a in env.agents}
+        action_legal, warnings_list = ActionHelper.are_actions_valid(actions, observation)
+        obs, rewards, dones, _ = env.step(actions)
         assert action_legal
-        env.step(actions)
 
-        if obs['a_0']['current_airport'] == cargo_info.location:
-            actions = {'a_0': {'process': 1, 'cargo_to_load': [cargo_info.id], 'cargo_to_unload': set(),
-                               'destination': 0}}
+    # Test Cargo that does not exist
+    for a in observation:
+        obs = observation[a]
+        actions[a] = {"process": 0,
+                      "cargo_to_load": [],
+                      "cargo_to_unload": [],
+                      "destination": NOAIRPORT_ID}
 
-            # Load the cargo
-            action_legal, warnings_list = ActionHelper.are_actions_valid(actions, obs)
-            assert action_legal
-            env.step(actions)
+        actions[a]["process"] = 1
+        actions[a]["cargo_to_load"].append(5)
+        actions[a]['destination'] = NOAIRPORT_ID
+        action_legal, warnings_list = ActionHelper.are_actions_valid(actions, observation)
+        obs, rewards, dones, _ = env.step(actions)
+        assert not action_legal
 
-            # Attempt to load another cargo at destination thats not there..
-            actions = {'a_0': {'process': 1, 'cargo_to_load': [cargo_info.id + 1], 'cargo_to_unload': set(),
-                               'destination': destination}}
-
-            action_legal, warnings_list = ActionHelper.are_actions_valid(actions, obs)
-            assert not action_legal
-
-    # Go to cargo destination, pick up the cargo
+    # Make sure cargo is onboard
+    assert obs['a_0']['cargo_onboard']
 
 
-def unload_cargo(env, num_airports):
-    obs = env.observe()
+def unload_cargo(env):
+    observation = env.observe()
     cargo_info = oh.get_active_cargo_info(env.state(), 0)
-    while obs['a_0']['current_airport'] is not cargo_info.destination:
-        obs = env.observe()
-        routes_available = obs['a_0']['available_routes'][0]
-        destination = np.random.choice(routes_available)
-        actions = {'a_0': {'process': 0, 'cargo_to_load': set(), 'cargo_to_unload': set(), 'destination': destination}}
-        action_legal, warnings_list = ActionHelper.are_actions_valid(actions, obs)
-        assert action_legal
-        env.step(actions)
-        if obs['a_0']['current_airport'] == cargo_info.destination:
-            actions = {'a_0': {'process': 0, 'cargo_to_load': set(), 'cargo_to_unload': [cargo_info.id],
-                               'destination': 1}}
 
-            # Load the cargo
-            action_legal, warnings_list = ActionHelper.are_actions_valid(actions, obs)
-            assert action_legal
-            env.step(actions)
+    # Reach cargo destination, unload cargo
+    while observation['a_0']['current_airport'] is not cargo_info.destination or observation['a_0']['cargo_onboard']:
+        actions = {a: None for a in env.agents}
+        for a in observation:
+            obs = observation[a]
+            actions[a] = {"process": 0,
+                          "cargo_to_load": [],
+                          "cargo_to_unload": [],
+                          "destination": NOAIRPORT_ID}
 
-            # Attempt to unload another cargo at destination thats not there..
-            actions = {'a_0': {'process': 1, 'cargo_to_load': set(), 'cargo_to_unload': [cargo_info.id + 1],
-                               'destination': destination}}
+            if obs['current_airport'] is cargo_info.destination:
+                actions[a]["process"] = 1
+                actions[a]["cargo_to_unload"].append(cargo_info.id)
+                actions[a]['destination'] = NOAIRPORT_ID
+                action_legal, warnings_list = ActionHelper.are_actions_valid(actions, observation)
+                obs, rewards, dones, _ = env.step(actions)
+                assert action_legal
+            else:
+                action_legal, warnings_list = ActionHelper.are_actions_valid(actions, observation)
+                actions[a]['destination'] = cargo_info.destination
+                obs, rewards, dones, _ = env.step(actions)
+                assert action_legal
 
-            action_legal, warnings_list = ActionHelper.are_actions_valid(actions, obs)
-            assert not action_legal
+    # Step ahead a bit to account for processing time, currently set to 0 but still need +1 step.
+    actions = {a: None for a in env.agents}
+    action_legal, warnings_list = ActionHelper.are_actions_valid(actions, observation)
+    assert action_legal
+    obs, rewards, dones, _ = env.step(actions)
+
+    # Try and unload some random cargo
+    for a in observation:
+        obs = observation[a]
+        actions[a] = {"process": 0,
+                      "cargo_to_load": [],
+                      "cargo_to_unload": [],
+                      "destination": NOAIRPORT_ID}
+
+        actions[a]["process"] = 1
+        actions[a]["cargo_to_unload"].append(5)
+        actions[a]['destination'] = NOAIRPORT_ID
+        action_legal, warnings_list = ActionHelper.are_actions_valid(actions, observation)
+        obs, rewards, dones, _ = env.step(actions)
+        assert not action_legal
+
+    # Make sure cargo is no longer in airplane
+    assert not obs['a_0']['cargo_onboard']
