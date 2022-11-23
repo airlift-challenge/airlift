@@ -107,6 +107,7 @@ def load_cargo(env):
         action_legal, warnings_list = ActionHelper.are_actions_valid(actions, observation)
         obs, rewards, dones, _ = env.step(actions)
         assert action_legal
+        assert obs['a_0']['cargo_onboard']
 
     # Test Cargo that does not exist
     for a in observation:
@@ -124,7 +125,7 @@ def load_cargo(env):
         assert not action_legal
 
     # Make sure cargo is onboard
-    assert obs['a_0']['cargo_onboard']
+
 
 
 def unload_cargo(env):
