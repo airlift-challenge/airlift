@@ -73,9 +73,8 @@ class StaticCargoGenerator(CargoGenerator):
         """
         Generates static cargo orders upon creation of the environment.
 
-        :Returns:
-        -------
-        `order_list` : Returns a set that contains all the (static) generated cargo orders
+        :return: `order_list` - Returns a set that contains all the (static) generated cargo orders
+
         """
 
         self.current_cargo_count = self.num_initial_tasks
@@ -92,17 +91,10 @@ class StaticCargoGenerator(CargoGenerator):
         concentrated drop off or pick up location as well as non-concentrated locations that utilize the entire map.
         The dynamic cargo generator accesses this function without going through the above generate_order function.
 
-        :Parameters:
-        ----------
-        `cargo_id` : Incremental count of what cargo to create
-
-        `drop_off_airports` : List that contains all the airports that are drop off locations'
-
-        `pick_up_airports` : List that contains all the airports that are pick up locations
-
-        :Returns:
-        -------
-        `cargo_task` : A fully generated cargo task
+        :parameter cargo_id: Incremental count of what cargo to create
+        :parameter drop_off_airports: List that contains all the airports that are drop off locations'
+        :parameter pick_up_airports: List that contains all the airports that are pick up locations
+        :return: `cargo_task` : A fully generated cargo task
 
         """
 
@@ -124,15 +116,10 @@ class StaticCargoGenerator(CargoGenerator):
         Creates a schedule that cargo must be delivered by for it to be considered late (soft deadline) or completely
         missed (hard deadline)
 
-        :Parameters:
-        ----------
-        `source` : Source Airport
+        :parameter source: Source Airport
+        :parameter destination: Destination Airport
+        :return: `(soft_deadline, hard_deadline)` : Returns a tuple[int, int] containing soft/hard deadlines for cargo.
 
-        `destination` : Destination Airport
-
-        :Returns:
-        -------
-        `soft_deadline, hard_deadline` : Returns a tuple[int, int] containing soft/hard deadlines for cargo.
         """
         # Note for hops - we subtract indices to ignore the starting airport
 
@@ -173,9 +160,8 @@ class DynamicCargoGenerator(StaticCargoGenerator):
         The EventGenerator controls whether a new dynamic cargo is generated or not using poisson distribution. Makes sure that
         the upperbound limit of max cargo generated per episode is also adhered to.
 
-        :Returns:
-        ----------
-        `cargo_task` : a List that contains a single Cargo or an empty list if no cargo was generated
+        :return: `cargo_task` : a List that contains a single Cargo or an empty list if no cargo was generated
+
         """
         if self.eventgen.generate() and \
                 self.current_cargo_count < self.max_cargo_per_episode:
@@ -288,9 +274,8 @@ class HardcodedCargoGenerator(CargoGenerator):
         """
         Generates the initial hard-coded cargo values.
 
-        :Returns:
-        -------
-        `initialcargo` : A set that contains the cargo.
+        :return: `initialcargo` : A set that contains the cargo.
+
         """
         initialcargo = [Cargo(c.id,
                               self.routemap.airports_by_id[c.source_airport_id],

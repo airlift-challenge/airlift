@@ -161,16 +161,11 @@ class AirliftEnv(ParallelEnv):
 
     def reset(self, seed=None) -> Dict:
         """
-        Resets the environment and generates a new random realization.
-        If called without a seed, a new realization is generated.
+        Resets the environment and generates a new random realization. If called without a seed, a new realization is generated.
 
-        :Parameters:
-        ----------
-        `seed` : Environment seed
+        :parameter seed: Environment seed
+        :return: A dictionary containing the initial observations for all agents. Individual observations of agents can be accessed using the 'a_0...n' keys.
 
-        :Returns:
-        -------
-        `observe` : A dictionary containing the initial observations for all agents. Individual observations of agents can be accessed using the 'a_0...n' keys.
         """
         self.agents = list(
             self.possible_agents)  # Make a copy of the list so that we don't affect possible_agents when we remove done agents
@@ -277,16 +272,10 @@ class AirliftEnv(ParallelEnv):
         Steps the environment base don the given actions
         and returns a new observation. Based on the new observation, the policy should create another set of actions for the next step.
 
-        :Parameters:
-        ----------
-        `actions` : Dictionary that contains the actions for all agents
+        :parameter actions: Dictionary that contains the actions for all agents
+        :return: obs, Dictionary that contains the observation for all agents. rewards,Dictionary that contains rewards.
+            dones, Dictionary that indicates if an agent has completed a scenario. info, A dictionary containing a list of Warnings for each agent.
 
-        :Returns:
-        -------
-        `obs` : Dictionary that contains the observation for all agents
-        `rewards`: Dictionary that contains rewards
-        `dones` : Dictionary that indicates if an agent has completed a scenario
-        `info` : A dictionary contain containing a list of Warnings for each agent.
         """
 
         if actions is None:
@@ -763,8 +752,10 @@ class AirliftEnv(ParallelEnv):
 
 # Helper functions for making actions
 class ActionHelper:
-    """Assists policies in making actions for loading, unloading, processing, No-Op or taking off. Also includes a
-    sample valid action function that is utilized for the Random Agent"""
+    """
+    Assists policies in making actions for loading, unloading, processing, No-Op or taking off. Also includes a
+    sample valid action function that is utilized for the Random Agent
+    """
 
     def __init__(self, np_random=seeding.np_random()[0]):
         self._np_random = np_random
@@ -810,13 +801,9 @@ class ActionHelper:
         """
         Loads Cargo by ID
 
-        :Parameters:
-        ----------
-        'cargo_to_load:' int,cargo ID to load
+        :parameter cargo_to_load: int,cargo ID to load
+        :return: A dictionary containing all the actions the agent will take that includes the cargo to load.
 
-        :Returns:
-        -------
-        A dictionary containing all the actions the agent will take that includes the cargo to load.
         """
         return ActionHelper().process_action(cargo_to_load=cargo_to_load)
 
@@ -825,13 +812,8 @@ class ActionHelper:
         """
         Unloads Cargo by ID
 
-        :Parameters:
-        ----------
-        `cargo_to_unload`: int, cargo ID to unload
-
-        :Returns:
-        -------
-        A dictionary containing all the actions the agent will take that includes the cargo to unload.
+        :parameter cargo_to_unload: int, cargo ID to unload
+        :return: A dictionary containing all the actions the agent will take that includes the cargo to unload.
 
         """
         return ActionHelper().process_action(cargo_to_unload=cargo_to_unload)
@@ -841,15 +823,10 @@ class ActionHelper:
         """
         Processes an action
 
-        :Parameters:
-        ----------
-        `cargo_to_load`: A list containing the cargo IDs to load
+        :parameter cargo_to_load: A list containing the cargo IDs to load
+        :parameter cargo_to_unload: A list containing cargo IDs to unload
+        :return: A dictionary that contains all the cargo to load and unload.
 
-        `cargo_to_unload`: A list containing cargo IDs to unload
-
-        :Returns:
-        -------
-        A dictionary that contains all the cargo to load and unload.
         """
         if isinstance(cargo_to_load, int):
             cargo_to_load = [cargo_to_load]
@@ -861,14 +838,11 @@ class ActionHelper:
     @staticmethod
     def takeoff_action(destination: int) -> dict:
         """
+        Gives the next destination
 
-        :Parameters:
-        ----------
-        `destination`: int, destination ID airport
+        :parameter destination: int, destination ID airport
+        :return: A dictionary containing the destination for the airplane to take off to.
 
-        :Returns:
-        -------
-        A dictionary containing the destination for the airplane to take off to.
         """
         return {"process": 0, "cargo_to_load": [], "cargo_to_unload": [],
                 "destination": destination}
@@ -878,9 +852,8 @@ class ActionHelper:
         """
         No-Op Action, "Do nothing"
 
-        :Returns:
-        -------
-        A dictionary where the values contained will make the airplane take no action.
+        :return: A dictionary where the values contained will make the airplane take no action.
+
         """
         return {"process": 0, "cargo_to_load": [], "cargo_to_unload": [],
                 "destination": NOAIRPORT_ID}
@@ -890,13 +863,9 @@ class ActionHelper:
         """
         Checks if an action is a No-Op action.
 
-        :Parameters:
-        ----------
-        `action`: dictionary, contains actions of a single agent
+        :parameter action: dictionary, contains actions of a single agent
+        :return: Boolean, True if No-Op action.
 
-        :Returns:
-        -------
-        Boolean, True if No-Op action.
         """
         return not action["process"] and \
                action["destination"] == NOAIRPORT_ID
@@ -961,48 +930,39 @@ class ObservationHelper:
         """
         Checks to see if an airplane is idle.
 
-        :Parameters:
-        ----------
-        `airplane_obs`: agent observation
+        :parameter airplane_obs: agent observation
+        :return: Returns True if the Airplane is in the Waiting state, or ready for take off and does not have any actions assigned.
 
-        :Returns:
-        -------
-        Returns True if the Airplane is in the Waiting state, or ready for take off and does not have any actions assigned.
         """
         return ActionHelper.is_noop_action(airplane_obs["next_action"]) \
                and airplane_obs["state"] in [PlaneState.WAITING, PlaneState.READY_FOR_TAKEOFF]
 
     @staticmethod
     def available_destinations(state, airplane_obs, plane_type: PlaneTypeID):
+
         """
+        Returns available destination from an airport node.
 
-        :Parameters:
-        ----------
-        `state`: Airplane current state
-        `airplane_obs`: Airplane Observation
-        `plane_type`: Airplane Model by PlaneTypeID
+        :parameter state: Airplane current state
+        :parameter airplane_obs: Airplane Observation
+        :parameter plane_type: Airplane Model by PlaneTypeID
+        :return: Returns a list of all available destinations that the agent can travel to from its current node.
 
-        :Returns:
-        -------
-        Returns a list of all available destinations that the agent can travel to from its current node.
         """
         return [o for i, o in state["route_map"][plane_type].out_edges(airplane_obs["current_airport"])]
 
     @staticmethod
     def get_lowest_cost_path(state, airport1, airport2, plane_type: PlaneTypeID):
+
         """
         Gets the shortest path from airport1 to airport2 based on the plane model.
 
-        :Parameters:
-        ----------
-        `state`: Airplane current state
-        `airport1`: From Airport
-        `airport2`: To Airport
-        `plane_type`: airplane model by PlaneTypeID
+        :parameter state: Airplane current state
+        :parameter airport1: From Airport
+        :parameter airport2: To Airport
+        :parameter plane_type: airplane model by PlaneTypeID
+        :return: A list containing the shortest path from airport1 to airport2.
 
-        :Returns:
-        -------
-        A list containing the shortest path from airport1 to airport2.
         """
         return nx.shortest_path(state["route_map"][plane_type], airport1, airport2, weight="cost")
 
@@ -1011,14 +971,10 @@ class ObservationHelper:
         """
         Gets current active cargo info. Active cargo is cargo that has not been assigned & delivered.
 
-        :Parameters:
-        ----------
-        `state`: Airplane current state
-        `cargoid`: Cargo by ID
+        :parameter state: Airplane current state
+        :parameter cargoid: Cargo by ID
+        :return: A list containing all the currently active cargo.
 
-        :Returns:
-        -------
-        A list containing all the currently active cargo.
         """
         cargo_infos = [ci for ci in state["active_cargo"] if ci.id == cargoid]
         if cargo_infos:
@@ -1038,13 +994,9 @@ class ObservationHelper:
         """
         Gets the routemap as a multigraph.
 
-        :Parameters:
-        ----------
-        `state:` Current Airplane state
+        :parameter state: Current Airplane state
+        :return: A route map as a MultiDiGraph
 
-        :Returns:
-        -------
-        A route map as a MultiDiGraph
         """
         return RouteMap.build_multigraph(state["route_map"])
 

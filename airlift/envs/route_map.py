@@ -111,14 +111,13 @@ class RouteMap:
         Adds an edge between two nodes. Populates the edge with airplane model, time, cost and adds a malfunction
         object to it.
 
-        Parameters
-        ----------
-        plane_model - Airplane Model
-        airport1 - From Airport
-        airport2 - To Airport
-        time - Time to traverse the edge
-        cost - Cost of traversing the edge
-        malfunction_generator - Parameters for creating route malfunctions
+        :parameter plane_model: Airplane Model
+        :parameter airport1: From Airport
+        :parameter airport2: To Airport
+        :parameter time: Time to traverse the edge
+        :parameter cost: Cost of traversing the edge
+        :parameter malfunction_generator: Parameters for creating route malfunctions
+        :parameter bidirectional: Boolean, True if route is bidirectional.
 
         """
 
@@ -183,31 +182,25 @@ class RouteMap:
 
     def get_flight_time(self, start: Airport, end: Airport, plane: PlaneType) -> int:
         """
+        Gets the flight time associated with traversing from start to end Airport.
 
-        Parameters
-        ----------
-        start - Starting Airport
-        end - Ending Airport
-        plane_model - Airplane Model
+        :parameter start: Starting Airport
+        :parameter end: Ending Airport
+        :parameter plane: Airplane Model
+        :return: `flight_time` : Flight Time associated with traversing from start to end node
 
-        Returns
-        -------
-        flight_time - Flight Time associated with traversing from start to end node
         """
         return self.graph[plane].edges[start.id, end.id]["time"]
 
     def get_flight_cost(self, start: Airport, end: Airport, plane: PlaneType) -> float:
         """
+        Gets the flight cost associated with traversing from start to end airport.
 
-        Parameters
-        ----------
-        start - Starting Airport
-        end - Ending Airport
-        plane_model - Airplane Model
+        :parameter start: Starting Airport
+        :parameter end: Ending Airport
+        :parameter plane: Airplane Model
+        :return: `flight_distance` : Returns the distance (cost) associated with traversing from start to end node
 
-        Returns
-        -------
-        flight_distance - Returns the distance (cost) associated with traversing from start to end node
         """
         return self.graph[plane].edges[start.id, end.id]["cost"]
 
@@ -215,45 +208,34 @@ class RouteMap:
         """
         Checks to see if an airport is reachable from the current airport.
 
-        Parameters
-        ----------
-        destination - Destination Airport
-        source - Starting Airport
-        plane_model - Airplane Model
+        :parameter destination: Destination Airport
+        :parameter source: Starting Airport
+        :parameter plane_type: Airplane Model
+        :return: `boolean` : Returns True if an airplane can travel directly from source to destination
 
-        Returns
-        -------
-        Returns True if an airplane can travel directly from source to destination
         """
 
         return (source.id, destination.id) in self.graph[plane_type].edges
 
     def get_malfunction_time(self, source: AirportID, destination: AirportID, plane_type: PlaneType) -> int:
         """
+        Returns the time remaining on a route being offline.
 
-        Parameters
-        ----------
-        source - Starting Airport
-        destination - Destination Airport
-        plane_model - Airplane Model
+        :parameter source: Starting Airport
+        :parameter destination: Destination Airport
+        :parameter plane_type: Airplane Model
+        :return: `int`: An integer that contains how long (in steps) an edge is malfunctioning for
 
-        Returns
-        -------
-        integer that contains how long (in steps) an edge is malfunctioning for
         """
         return self.graph[plane_type].edges[(source, destination)]['mal'].malfunction_down_counter
 
     # Count for total malfunctions seems to be too high. Unsure what the cause is.
     def get_total_malfunctions(self) -> int:
         """
+        Returns total malfunctions in episode.
 
-        Parameters
-        ----------
-        plane_model - Airplane Model
+        :return: `int` : An integer containing how many malfunctions have occurred
 
-        Returns
-        -------
-        integer containing how many malfunctions have occurred
         """
         total_malfunctions_in_episode = 0
         for plane_type in self.plane_types:
@@ -268,14 +250,12 @@ class RouteMap:
 
     def get_available_routes(self, source: Airport, plane_type: PlaneType) -> Collection:
         """
-        Parameters
-        ----------
-        source - Source Airport
-        plane_model - Airplane Model
+        Gets all available routes from an Airport Node to ones it can directly travel to.
 
-        Returns
-        -------
-        frozenset that contains what routes are disabled/malfunctioning
+        :parameter source: Source Airport
+        :parameter plane_model: Airplane Model
+        :return: `frozenset` : a frozenset that contains what routes are disabled/malfunctioning
+
         """
         routes = self.graph[plane_type].adj[source.id]
         return [dest for dest, d in routes.items() if not d['mal'].in_malfunction]

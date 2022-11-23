@@ -185,9 +185,10 @@ class FlatRenderer(EnvRenderer):
 
     def render_to_file(self, filename):
         """
-        Renders the current scene into a image file
-        :param filename: filename where to store the rendering output_generator
-        (supported image format *.bmp , .. , *.png)
+        Renders the current scene into image file
+
+        :parameter filename: filename where to store the rendering output_generator.
+
         """
         img = self.render_to_image()
         img.save(filename)

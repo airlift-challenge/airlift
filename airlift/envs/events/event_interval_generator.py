@@ -30,10 +30,9 @@ class EventIntervalGenerator:
         """
         Generates an Event with an Interval from min duration to max duration
 
-        :Returns:
-        -------
-        `EventInterval`: a NamedTuple that contains the number of steps something will become unavailable for. The number of
-        steps is 0 of an interval wasn't generated.
+        :return: `EventInterval`: a NamedTuple that contains the number of steps something will become unavailable for. The number of
+            steps is 0 of an interval wasn't generated.
+
         """
         if self.eventgen.generate():
             if not self._randcache:

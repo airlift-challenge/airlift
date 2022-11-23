@@ -23,12 +23,11 @@ class Solution:
         """
         Resets the solution with a seed. initializes  the state space, observation space and action space.
 
-        :Parameters:
-        ----------
-        `obs`: A dictionary containing the observation
-        `observation_spaces`: A dictionary containing all the observation spaces
-        `action_spaces`: A dictionary containing all the action spaces.
-        seed 
+        :parameter obs: A dictionary containing the observation
+        :parameter observation_spaces: A dictionary containing all the observation spaces
+        :parameter action_spaces: A dictionary containing all the action spaces.
+        :parameter seed: Environment seed.
+
         """
         # If a new seed is passed in, re-seed the solution.
         # If solution has not been reset yet, also do the seeding regardless.
@@ -44,15 +43,11 @@ class Solution:
         """
         The main policy for returning actions for each agent is contained here.
 
-        :Parameters:
-        ----------
-        `obs`: A dictionary containing an observation
-        `dones`: A dictionary containing the done values for each agent
-
-        :Returns:
-        -------
-        Actions for each agent.
+        :parameter obs: A dictionary containing an observation
+        :parameter dones: A dictionary containing the done values for each agent
+        :return: Actions for each agent.
         """
+
         raise NotImplementedError
 
     @staticmethod
@@ -65,20 +60,17 @@ def doepisode(env, solution, render=False, env_seed=None, solution_seed=None, re
     """
     Runs a single episode.
 
-    :Parameters:
-    ----------
-    `env`: AirLiftEnv - An initialized Airlift Environment
-    `solution`: Solution - the solution that is being utilized
-    `render`: Render options, (video, window, none...)
-    `env_seed`: int, environment seed,
-    `solution_seed`: int, solution seed
-    `render_sleep_time`: float, sleep timer
+    :parameter env: AirLiftEnv - An initialized Airlift Environment
+    :parameter solution: Solution - the solution that is being utilized
+    :parameter render: Render options, (video, window, none...)
+    :parameter env_seed: int, environment seed,
+    :parameter solution_seed: int, solution seed
+    :parameter render_sleep_time: float, sleep timer
+    :return: `env.env_info`: a NamedTuple that contains all the environment initialization parameters
+        `env.metrics`: a NamedTuple that contains all the environment metrics collected for the solution.
 
-    :Returns:
-    -------
-    `env.env_info`: a NamedTuple that contains all the environment initialization parameters
-    `env.metrics`: a NamedTuple that contains all the environment metrics collected for the solution.
     """
+
     # Run a single episode here
     step = 0
     _done = False

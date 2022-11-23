@@ -177,13 +177,9 @@ class EnvAgent:
         """
         Filters out invalid cargo from the given cargo collection.
 
-        :Parameters:
-        ----------
-        `cargo_ids` : A list of CargoIDs
-
-        `cargo_by_id` : Dictionary containing all the cargo and IDs
-
-        `warnings` : A list containing any warnings. In this case if a particular cargo ID does not exist.
+        :parameter cargo_ids: A list of CargoIDs
+        :parameter cargo_by_id: Dictionary containing all the cargo and IDs
+        :parameter warnings: A list containing any warnings. In this case if a particular cargo ID does not exist.
 
         """
         valid_ids = []
@@ -199,18 +195,11 @@ class EnvAgent:
         """
         Updates the agent's state.
 
-        :Parameters:
-        ----------
-        `action` : A dictionary of actions that contains 'process', 'cargo_to_load', 'cargo_to_unload' and 'destination'
+        :parameter action: A dictionary of actions that contains 'process', 'cargo_to_load', 'cargo_to_unload' and 'destination'
+        :parameter cargo_by_id: Dictionary containing the Cargo and CargoID
 
-        `cargo_by_id` : Dictionary containing the Cargo and CargoID
+        :return: Tuple containing updated_action and warnings. The updated action contains any updated events to the action dict that occurred during the time step. The warnings list contains any issues with the current actions given.
 
-        :Returns:
-        -------
-        `updated_action` : The updated action contains any updated events to the action dict that occurred during the time
-        step
-
-        `warnings` : A list containing any issues with the current actions given.
         """
         self.last_state = self.state
         warnings: List[str] = []
@@ -239,15 +228,9 @@ class EnvAgent:
         Checks to see if the current airport has capacity. If there is capacity the agent will go into
         the PROCESSING state and the processing timer will be updated. The agent is added to the airports capacity.
 
-        :Parameters:
-        ----------
-        `cargo_to_load` : A set that contains cargo to load
-
-        `cargo_to_unload` : A set that contains cargo to unload
-
-        :Returns:
-        -------
-        `success` : If successfully load or unloaded cargo
+        :parameter cargo_to_load: A set that contains cargo to load
+        :parameter cargo_to_unload: A set that contains cargo to unload
+        :return: Boolean, if successfully load or unloaded cargo
 
         """
         success = False
@@ -267,11 +250,9 @@ class EnvAgent:
         Checks to make sure airplane can load cargo and loads the cargo. Also checks to ensure that cargo is assigned to
         that airplane
 
-        :Parameters:
-        ----------
-        `cargo_to_load` : A list that contains the Cargo to load
+        :parameter cargo_to_load: A list that contains the Cargo to load
+        :parameter warnings: List of warnings issued by the environment. Ex: If an action is given to an unavailable route
 
-        `warnings` : List of warnings issued by the environment. Ex: If an action is given to an unavailable route
         """
 
         for cargo in cargo_to_load:
@@ -292,14 +273,13 @@ class EnvAgent:
                         "Unable to load Cargo ID: " + str(cargo.id) + " due to exceeding allowed airplane weight limit")
 
     def unload_cargo(self, cargo_to_unload: Collection[Cargo], warnings: List[str]):
+
         """
         Does a check to ensure the correct cargo is being unloaded and removes the cargo from the airplane.
 
-        :Parameters:
-        ----------
-        `cargo_to_unload` : A list that contains the Cargo to unload
+        :parameter cargo_to_unload: A list that contains the Cargo to unload
+        :parameter warnings: List of warnings issued by the environment. Ex: If an action is given to an unavailable route
 
-        `warnings` : List of warnings issued by the environment. Ex: If an action is given to an unavailable route
         """
 
         for cargo in cargo_to_unload:
@@ -313,12 +293,13 @@ class EnvAgent:
 
     @property
     def current_cargo_weight(self) -> float:
+
         """
         Gets the total current cargo weight on an airplane
 
-        :Returns:
-        -------
-        `weight` : current cargo weight on an airplane
+        :return: current cargo weight on an airplane
+
         """
+
         weight = sum(c.weight for c in self.cargo)
         return weight

@@ -35,13 +35,8 @@ class AirplaneGenerator:
         that location. This in turn makes sure that the agent is not stuck on one single airport. The dictionary keys are 
         accessible using the plane model: Ex: 0, 1..
 
-        :Parameters:
-        ----------
-        `routemap`: A Dictionary of DiGraphs that that contains all the routes specific plane models are able to traverse
-
-        Returns
-        ---------
-        `airplanes`: A list that contains all the EnvAgents
+        :parameter routemap: A Dictionary of DiGraphs that that contains all the routes specific plane models are able to traverse
+        :return: `airplanes`, A list that contains all the EnvAgents
 
         """
         # First, place an airplane in each connected component (this ensures feasibility)
@@ -84,10 +79,8 @@ class AirplaneGenerator:
         """
         Makes sure every connected component of the graph has at least one airplane
 
-        :Parameters:
-        ----------
-        `routemap`: A dictionary that contains all the DiGraphs for each specific airplane model.
-        `airplanes`: A list of EnvAgents
+        :parameter routemap: A dictionary that contains all the DiGraphs for each specific airplane model.
+        :parameter airplanes: A list of EnvAgents
 
         """
         assert len(airplanes) == self.num_agents

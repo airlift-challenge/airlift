@@ -34,9 +34,7 @@ class Airport:
         """
         Adds a cargo item to an airport.
 
-        :Parameters:
-        ----------
-        `cargo` : 'Cargo'
+        :parameter cargo: Cargo to be added
         """
         self.cargo.add(cargo)
 
@@ -44,12 +42,7 @@ class Airport:
         """
         Removes cargo from the airport's cargo list
 
-        :Parameters:
-        ----------
-        `cargo` : Cargo
-
-        Returns
-        -------
+        :parameter cargo: Cargo to be removed
 
         """
         self.cargo.remove(cargo)
@@ -58,9 +51,8 @@ class Airport:
         """
         Adds an agent to the processing queue of an airport if it has capacity available.
 
-        :Parameters:
-        ----------
-        `agent` : EnvAgent
+        :parameter agent: Adds an agent to Airport capacity for processing.
+
         """
         if len(self.agents_processing) < self.allowed_capacity:
             assert agent not in self.agents_processing
@@ -70,9 +62,8 @@ class Airport:
         """
         Removes the agent from the processing queue.
 
-        :Parameters:
-        ----------
-        `agent` : EnvAgent
+        :parameter agent: Removes an agent from an airport capacity that has completed processing.
+
         """
 
         if self.agents_processing:
@@ -82,8 +73,7 @@ class Airport:
         """
         Checks to see if the current airport has capacity in order to start processing an agent.
 
-        :Returns:
-        -------
-        Boolean : True if there is space available
+        :return: Boolean, True if there is space available
+
         """
         return len(self.agents_processing) < self.allowed_capacity

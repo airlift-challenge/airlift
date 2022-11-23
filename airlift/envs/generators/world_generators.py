@@ -75,9 +75,8 @@ class AirliftWorldGenerator(WorldGenerator):
         the airport_generator.generate() function. One of the initialization parameters for the airport generator is to decide
         which world map generator to use with the keyword mapgen="".
 
-        :Returns:
-        -------
-        `(routemap, airplanes, cargo)` : Returns a Tuple that contains the Routemap, the list of agents and the set of cargo generated.
+        :return: `(routemap, airplanes, cargo)` : Returns a Tuple that contains the Routemap, the list of agents and the set of cargo generated.
+
         """
         # Re-generate map as necessary
         if not self.static_airports or self.airports is None:

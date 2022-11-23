@@ -12,11 +12,13 @@ from airlift.utils.seeds import generate_seed
 class CannotPlaceZoneOnLand(Exception):
     pass
 
+
 class AirportGenerator:
     """
     Generates Airports in the environment. Controls where pick up and drop of zones are located as well as their
     respective sizes and distances from each other. Controls which map generator is also utilized.
     """
+
     def __init__(self,
                  max_airports,
                  processing_time,
@@ -145,6 +147,7 @@ class GridAirportGenerator(AirportGenerator):
     """
     Generates Airports in a Grid utilizing a plain map
     """
+
     def __init__(self,
                  rows=2,
                  columns=2,
@@ -185,12 +188,12 @@ class GridAirportGenerator(AirportGenerator):
         `dropoff_area` : An area containing the designated cargo dropoff zone
         `pick_up_area` : An area containing the designated cargo pickup zone
         """
-        #edge_pad = airport_radius
-        edge_pad = 0.02 # Fraction of height/width with which to pad
+        # edge_pad = airport_radius
+        edge_pad = 0.02  # Fraction of height/width with which to pad
 
-        #height = 2 * edge_pad + (columns * 2 * airport_radius)
-        height = (1 + 2*edge_pad) * ((self.rows * 2) * self.airport_radius)
-        width = (1 + 2*edge_pad) * ((self.columns * 2) * self.airport_radius)
+        # height = 2 * edge_pad + (columns * 2 * airport_radius)
+        height = (1 + 2 * edge_pad) * ((self.rows * 2) * self.airport_radius)
+        width = (1 + 2 * edge_pad) * ((self.columns * 2) * self.airport_radius)
 
         good_zones = False
         while not good_zones:
@@ -205,8 +208,8 @@ class GridAirportGenerator(AirportGenerator):
         # Generate x and y coordinates - space out the airports so that there is exactly 1 per unit square area
         for col in range(self.columns):
             for row in range(self.rows):
-                world_coord = FlatCoordinate((width*edge_pad + ((1 + 2 * col) * self.airport_radius),
-                                              height*edge_pad + ((1 + 2 * row) * self.airport_radius)))
+                world_coord = FlatCoordinate((width * edge_pad + ((1 + 2 * col) * self.airport_radius),
+                                              height * edge_pad + ((1 + 2 * row) * self.airport_radius)))
 
                 if map.is_land(world_coord):
                     airport_coords.append(world_coord)
@@ -221,8 +224,11 @@ class GridAirportGenerator(AirportGenerator):
 
 class RandomAirportGenerator(AirportGenerator):
     """
+
     Generates Airports uniformly at random
+
     """
+
     def __init__(self,
                  max_airports=20,
                  airports_per_unit_area: float = 1,
@@ -265,6 +271,7 @@ class RandomAirportGenerator(AirportGenerator):
 
         self.aspect_ratio = aspect_ratio
         self.mapgen = mapgen
+
     def _grid_to_coord(self, map: FlatMap, gridxy: Tuple[int, int]) -> FlatCoordinate:
         x = gridxy[0] * map.width / map.grid_size[0]
         y = gridxy[1] * map.height / map.grid_size[1]
@@ -274,19 +281,16 @@ class RandomAirportGenerator(AirportGenerator):
         """
         Generates the airport coordinates/locations, the map, as well as the designated drop-off and pickup areas.
 
-        :Returns:
-        -------
-        `airports`:  A list of airports
+        :return: A tuple containing,
+            `airports` :  A list of airports
+            `map` : A generated world map that was created using the map generator
+            `dropoff_area` : An area containing the designated cargo dropoff zone
+            `pick_up_area` : An area containing the designated cargo pickup zone
 
-        `map`: A generated world map that was created using the map generator
-
-        `dropoff_area`: An area containing the designated cargo dropoff zone
-
-        `pick_up_area`: An area containing the designated cargo pickup zone
         """
         assert self.max_airports > self.num_drop_off_airports + self.num_pick_up_airports
         total_area = (
-                                 self.max_airports - self.num_drop_off_airports - self.num_pick_up_airports) / self.airports_per_unit_area \
+                             self.max_airports - self.num_drop_off_airports - self.num_pick_up_airports) / self.airports_per_unit_area \
                      + 2 * math.pi * self.drop_off_area_radius \
                      + self.pick_up_area_size[0] * self.pick_up_area_size[1]
         width = math.sqrt(total_area / self.aspect_ratio)
@@ -348,12 +352,11 @@ class RandomAirportGenerator(AirportGenerator):
         return airports, map, dropoff_area, pick_up_area
 
 
-
-
 class GridAirportGenerator(AirportGenerator):
     """
     Generates Airports in a Grid utilizing a plain map
     """
+
     def __init__(self,
                  rows=2,
                  columns=2,
@@ -387,22 +390,19 @@ class GridAirportGenerator(AirportGenerator):
         """
         Generates the airport coordinates/locations, the map, as well as the designated drop-off and pickup areas.
 
-        :Returns:
-        -------
-        `airports` :  A list of airports
+        :return: A tuple containing,
+            `airports` :  A list of airports
+            `map` : A generated world map that was created using the map generator
+            `dropoff_area` : An area containing the designated cargo dropoff zone
+            `pick_up_area` : An area containing the designated cargo pickup zone
 
-        `map` : A generated world map that was created using the map generator
-
-        `dropoff_area` : An area containing the designated cargo dropoff zone
-
-        `pick_up_area` : An area containing the designated cargo pickup zone
         """
-        #edge_pad = airport_radius
-        edge_pad = 0.02 # Fraction of height/width with which to pad
+        # edge_pad = airport_radius
+        edge_pad = 0.02  # Fraction of height/width with which to pad
 
-        #height = 2 * edge_pad + (columns * 2 * airport_radius)
-        height = (1 + 2*edge_pad) * ((self.rows * 2) * self.airport_radius)
-        width = (1 + 2*edge_pad) * ((self.columns * 2) * self.airport_radius)
+        # height = 2 * edge_pad + (columns * 2 * airport_radius)
+        height = (1 + 2 * edge_pad) * ((self.rows * 2) * self.airport_radius)
+        width = (1 + 2 * edge_pad) * ((self.columns * 2) * self.airport_radius)
 
         map = self._mapgen.generate(height, width)
         dropoff_area, pick_up_area = self._generate_zones(map)
@@ -411,8 +411,8 @@ class GridAirportGenerator(AirportGenerator):
         # Generate x and y coordinates - space out the airports so that there is exactly 1 per unit square area
         for col in range(self.columns):
             for row in range(self.rows):
-                world_coord = FlatCoordinate((width*edge_pad + ((1 + 2 * col) * self.airport_radius),
-                                              height*edge_pad + ((1 + 2 * row) * self.airport_radius)))
+                world_coord = FlatCoordinate((width * edge_pad + ((1 + 2 * col) * self.airport_radius),
+                                              height * edge_pad + ((1 + 2 * row) * self.airport_radius)))
 
                 if map.is_land(world_coord):
                     airport_coords.append(world_coord)
@@ -450,20 +450,16 @@ class HardcodedAirportGenerator(AirportGenerator):
         self.drop_off_area = drop_off_area
         self.pick_up_area = pick_up_area
 
-
     def generate(self) -> Tuple[Collection[Airport], FlatMap, Optional[FlatArea], Optional[FlatArea]]:
         """
         Generates the airport coordinates/locations, the map, as well as the designated drop-off and pickup areas.
 
-        :Returns:
-        -------
-        `airports` :  A list of airports
+        :return: A tuple containing,
+            `airports` :  A list of airports
+            `map` : A generated world map that was created using the map generator
+            `dropoff_area` : An area containing the designated cargo dropoff zone
+            `pick_up_area` : An area containing the designated cargo pickup zone
 
-        `map` : A generated world map that was created using the map generator
-
-        `dropoff_area` : An area containing the designated cargo dropoff zone
-
-        `pick_up_area` : An area containing the designated cargo pickup zone
         """
 
         map = self._mapgen.generate(self.height, self.width)
