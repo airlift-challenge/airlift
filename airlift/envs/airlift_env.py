@@ -601,8 +601,8 @@ class AirliftEnv(ParallelEnv):
                                                             'weight': Discrete(10000),
                                                             'earliest_pickup_time': Discrete(100000),
                                                             'is_available': Discrete(2),
-                                                            'soft_deadline': Discrete(10000),
-                                                            'hard_deadline': Discrete(10000)
+                                                            'soft_deadline': Discrete(100000),
+                                                            'hard_deadline': Discrete(100000)
                                                             })
         return gym.spaces.Dict({
             "route_map": route_map,
