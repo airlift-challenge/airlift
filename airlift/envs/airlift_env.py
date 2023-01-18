@@ -93,6 +93,10 @@ class CargoObservation(NamedTuple):
     soft_deadline: int
     hard_deadline: int
 
+class ScenarioObservation(NamedTuple):
+    processing_time: int
+    working_capacity: int
+
 class AirliftEnv(ParallelEnv):
     """Controls all aspects of the simulation/environment.
     The primary interface is the step method, which provides observations/states to the agents and steps the environment
@@ -604,6 +608,9 @@ class AirliftEnv(ParallelEnv):
                                                             'soft_deadline': Discrete(100000),
                                                             'hard_deadline': Discrete(100000)
                                                             })
+
+        scenario_observation = airliftspaces.NamedTuple(ScenarioObservation, {'processing_time': Discrete(1000),
+                                                                              'working_capacity': Discrete(1000)})
         return gym.spaces.Dict({
             "route_map": route_map,
             "active_cargo": airliftspaces.List(cargo_info_space, self.world_generator.max_cargo_per_episode),
@@ -612,7 +619,8 @@ class AirliftEnv(ParallelEnv):
                                                                 'max_weight': Discrete(10000)}),
                 len(self.world_generator.plane_types)),
             "event_new_cargo": airliftspaces.List(cargo_info_space, self.world_generator.max_cargo_per_episode),
-            "agents": gym.spaces.Dict({a: self._agent_space() for a in self.possible_agents})
+            "agents": gym.spaces.Dict({a: self._agent_space() for a in self.possible_agents}),
+            "scenario_info": airliftspaces.List(scenario_observation,1)
         })
 
     def state(self):
@@ -680,6 +688,12 @@ class AirliftEnv(ParallelEnv):
                          cargo.soft_deadline,
                          cargo.hard_deadline)
 
+    def _build_scen_info_obs(self):
+        # These parameters are currently static and do not change throughout a scenario
+        # If max working_capacity or processing time ever become dynamic. This observation will have to be changed.
+        return ScenarioObservation(self.world_generator.airport_generator.working_capacity,
+                                   self.world_generator.airport_generator.processing_time)
+
     def _update_state_and_obs(self, new_cargo):
         for plane in self.routemap.plane_types:
             for u, v, data_routemap, data_state in self._state_graph_cache[plane.id]:
@@ -688,6 +702,7 @@ class AirliftEnv(ParallelEnv):
 
         self._state["active_cargo"] = [self._build_cargo_obs(c) for c in self.cargo if not self.cargo_done(c)]
         self._state["event_new_cargo"] = [self._build_cargo_obs(c) for c in new_cargo]
+        self._state["scenario_info"] = [self._build_scen_info_obs()]
 
         for agent in self.agents:
             agentobj = self._agents[agent]
