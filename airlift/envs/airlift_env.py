@@ -90,6 +90,8 @@ class CargoObservation(NamedTuple):
     weight: float
     earliest_pickup_time: int
     is_available: int
+    soft_deadline: int
+    hard_deadline: int
 
 class AirliftEnv(ParallelEnv):
     """Controls all aspects of the simulation/environment.
@@ -598,7 +600,9 @@ class AirliftEnv(ParallelEnv):
                                                                 self.world_generator.max_airports + 1),
                                                             'weight': Discrete(10000),
                                                             'earliest_pickup_time': Discrete(100000),
-                                                            'is_available': Discrete(2)
+                                                            'is_available': Discrete(2),
+                                                            'soft_deadline': Discrete(10000),
+                                                            'hard_deadline': Discrete(10000)
                                                             })
         return gym.spaces.Dict({
             "route_map": route_map,
@@ -672,7 +676,9 @@ class AirliftEnv(ParallelEnv):
                          cargo.end_airport.id,
                          cargo.weight,
                          cargo.earliest_pickup_time,
-                         cargo.is_available(self._elapsed_steps))
+                         cargo.is_available(self._elapsed_steps),
+                         cargo.soft_deadline,
+                         cargo.hard_deadline)
 
     def _update_state_and_obs(self, new_cargo):
         for plane in self.routemap.plane_types:
