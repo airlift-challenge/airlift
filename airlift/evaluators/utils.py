@@ -26,7 +26,7 @@ def doeval(test_folder: Path,
     observation = True
     while observation:
         observation, info, status = evaluator.env_create()
-        dones = None
+        dones = evaluator._env.dones
         if status == Status.FINISHED_ALL_SCENARIOS:
             # When evaluation is complete, the evaluator responds false for the observation
             print("Evaluation Complete")
@@ -35,7 +35,6 @@ def doeval(test_folder: Path,
             print("Evaluation Ended due to too many missed cargo.")
             break
         print("Episode : {}".format(episode))
-        episode += 1
 
         solution.reset(observation, seed=solution_seed)
 
@@ -45,6 +44,7 @@ def doeval(test_folder: Path,
             observation, all_rewards, dones, info = evaluator.env_step(action)
             if all(dones.values()):
                 print("Episode {} Done".format(episode))
+                episode += 1
                 break
 
         solution_seed += 1
@@ -132,7 +132,7 @@ def generate_scenarios(output_path, scenarios: List[ScenarioInfo], multiprocess=
                 header, row = generate_scenario(scenario, output_path, base_env_seed + i, base_solution_seed + i,
                                                 run_random=run_random, run_baseline=run_baseline)
                 if i == 0:
-                    assert header is not None # This could happen if first scenario generator fails
+                    assert header is not None  # This could happen if first scenario generator fails
                     csvwriter.writerow(header)
                 if row is None:
                     warnings.warn("Missing results for row {0}".format(i))
