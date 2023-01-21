@@ -116,7 +116,7 @@ class LocalEvaluationService:
 
         mean_missed = np.mean(self.simulation_percentage_missed_per_test[test_id])
         if mean_missed > self.FAIL_THRESHOLD:
-            print("The solution missed an average of {0} percent of the deliveries on the last test, which exceeds the threshold of {1}".format(100*mean_missed, self.FAIL_THRESHOLD))
+            print("The solution missed an average of {0} percent of the deliveries on the last test, which exceeds the threshold of {1}".format(100*mean_missed, 100*self.FAIL_THRESHOLD))
             return True
         else:
             print("The solution missed an average of {0} percent of the deliveries on the last test".format(100*mean_missed))
@@ -301,7 +301,7 @@ class LocalEvaluationService:
                 "Episode finished in {} timesteps, {:.3f} seconds. Percentage deliveries missed: {:.3f}. Normalized score: {:.3f}.".format(
                     self.simulation_steps[-1],
                     self.simulation_times[-1],
-                    self.simulation_missed_deliveries[-1],
+                    100*self.simulation_missed_deliveries[-1],
                     self.simulation_scores_normalized[-1],
                 ))
 
