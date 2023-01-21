@@ -195,11 +195,11 @@ def generate_scenario(scenario, output_path, env_seed, solution_seed, run_random
 
         print("Done Generating {}".format(level_file))
 
-        # if run_baselines and randomenv.metrics.score <= baselineenv.metrics.score:
-        #     warnings.warn("Random solution did as well or better than baseline solutions - omitting from metadata")
-        #     os.remove(level_file)
-        #     return None, None
-        # else:
+        if run_baseline and randomenv.metrics.score <= baselineenv.metrics.score:
+             warnings.warn("Random solution did as well as or better than baseline solutions - omitting from metadata")
+             os.remove(level_file)
+             return None, None
+
         if True:
             header = ["test_id",
                       "level_id",
