@@ -15,10 +15,12 @@ import numpy as np
 from airlift.envs import AirliftEnv
 from airlift.utils.running_stats import RunningStat
 
+
 class Status(IntEnum):
     SUCCESSFUL_CREATION = 0
     STOPPED_TOO_MANY_MISSED = 1
     FINISHED_ALL_SCENARIOS = 2
+
 
 """
 Assumes the scenarios follow this structure:
@@ -36,16 +38,18 @@ Assumes the scenarios follow this structure:
     │   └── Level_99.pkl
     ├── ...... 
 """
+
+
 class LocalEvaluationService:
     def __init__(
-        self,
-        test_env_folder="/tmp",
-        output_dir = "./",
-        submission_id = -1,
-        fail_threshold = 0.75,
-        first_step_timeout_in_seconds=600,
-        step_timeout_in_seconds=60,
-        render=False,
+            self,
+            test_env_folder="/tmp",
+            output_dir="./",
+            submission_id=-1,
+            fail_threshold=0.3,
+            first_step_timeout_in_seconds=600,
+            step_timeout_in_seconds=60,
+            render=False,
     ):
 
         self.test_env_folder = test_env_folder
@@ -108,12 +112,14 @@ class LocalEvaluationService:
 
     def exceeded_missed_threshold(self, test_id):
         assert self.current_test in self.simulation_percentage_missed_per_test, \
-               "No environment was finished at all during test {}!".format(test_id)
+            "No environment was finished at all during test {}!".format(test_id)
 
         mean_missed = np.mean(self.simulation_percentage_missed_per_test[test_id])
         if mean_missed > self.FAIL_THRESHOLD:
-            print("The solution missed {0} percent of the delivieries, which exceeds the threshold of {1}".format(mean_missed, self.FAIL_THRESHOLD))
+            print("The solution missed an average of {0} percent of the deliveries on the last test, which exceeds the threshold of {1}".format(100*mean_missed, self.FAIL_THRESHOLD))
             return True
+        else:
+            print("The solution missed an average of {0} percent of the deliveries on the last test".format(100*mean_missed))
 
     def env_create(self):
         """
@@ -132,6 +138,17 @@ class LocalEvaluationService:
         if self.simulation_count == -1:
             self.overall_start_time = time.time()
 
+            # Create a default scores.txt at first test. All scores are assumed to be zero.
+            scores_file = open(self.output_dir + "scores.txt", "w")
+            scores_file.write("MEAN_Score: {:.3f}\n".format(0))
+            scores_file.write("SUM_Score: {:.3f}\n".format(0))
+            scores_file.write("MEAN_Normalized_Score: {:.3f}\n".format(0))
+            scores_file.write("MEAN_Percent_Missed: {:.3f}\n".format(0))
+            scores_file.write("set1_score: {:.3f}\n".format(0)) # SUM Normalized Score
+            scores_file.write("Duration: {:.3f}\n".format(0))
+            scores_file.close()
+
+
         # Check if test and/or evaluation is complete and do the following:
         # - Set evaluation_done if evaluation is complete (no more scenarios or too many missed deliveries)
         # - Set appropriate return status if evaluation is done
@@ -146,7 +163,11 @@ class LocalEvaluationService:
                 self.status = Status.STOPPED_TOO_MANY_MISSED
             else:
                 self.status = Status.FINISHED_ALL_SCENARIOS
-                self.num_tests_completed += 1 # Consider the last test complete
+                self.num_tests_completed += 1  # Consider the last test complete
+
+                # Account for final test scores.txt
+                self.create_scores_file()
+
         else:
             # Check the next test to see if we have finished the current test
             next_test = self.test_ids[self.simulation_count + 1]
@@ -156,6 +177,9 @@ class LocalEvaluationService:
                     self.status = Status.STOPPED_TOO_MANY_MISSED
                 else:
                     self.num_tests_completed += 1
+
+                    # Account for scores.txt at every test before reaching final test.
+                    self.create_scores_file()
 
         if evaluation_done:
             _observation = False
@@ -169,7 +193,7 @@ class LocalEvaluationService:
             test_env_file_path = self.env_filenames[self.simulation_count]
 
             print("=" * 15)
-            print("Evaluating {} ({}/{})".format(test_env_file_path, self.simulation_count+1, self.num_scenarios))
+            print("Evaluating {} ({}/{})".format(test_env_file_path, self.simulation_count + 1, self.num_scenarios))
 
             del self._env
             self._env = AirliftEnv.load(os.path.join(self.test_env_folder, test_env_file_path))
@@ -184,7 +208,7 @@ class LocalEvaluationService:
             self.simulation_steps.append(0)
 
             self.current_step = 0
-            _observation = self._env.reset(seed = self.seeds[self.simulation_count])
+            _observation = self._env.reset(seed=self.seeds[self.simulation_count])
 
             self.status = Status.SUCCESSFUL_CREATION
 
@@ -196,11 +220,11 @@ class LocalEvaluationService:
     def env_step(self, command):
         """ Handles a ENV_STEP command from the client
         """
-        #add in different time outs (first step is allowed to have up to a 10 min timeout)
-        #add in a null action instead of returning
+        # add in different time outs (first step is allowed to have up to a 10 min timeout)
+        # add in a null action instead of returning
         timeout = False
         if self.step_time_start != -1:
-            #give 10 minutes
+            # give 10 minutes
             if self.current_step == 0:
                 if (time.time() - self.step_time_start) > self.FIRST_STEP_TIMEOUT_IN_SECONDS:
                     timeout = True
@@ -242,7 +266,6 @@ class LocalEvaluationService:
             self.simulation_scores[-1] = self._env.metrics.score
             self.simulation_missed_deliveries[-1] = percentage_missed
 
-
             # adds 1.0 so we can add them up
             self.simulation_scores_normalized[-1] += \
                 (self.random_scores[self.simulation_count] - self._env.metrics.score) \
@@ -270,7 +293,9 @@ class LocalEvaluationService:
             if self.current_test not in self.simulation_percentage_missed_per_test:
                 self.simulation_percentage_missed_per_test[self.current_test] = []
             self.simulation_percentage_missed_per_test[self.current_test].append(percentage_missed)
-            print("Percentage of deliveries missed for test {}, level {}: {}".format(self.current_test, self.current_level, percentage_missed))
+            print("Percentage of deliveries missed for test {}, level {}: {}".format(self.current_test,
+                                                                                     self.current_level,
+                                                                                     100*percentage_missed))
 
             print(
                 "Episode finished in {} timesteps, {:.3f} seconds. Percentage deliveries missed: {:.3f}. Normalized score: {:.3f}.".format(
@@ -303,7 +328,7 @@ class LocalEvaluationService:
         print("#" * 100)
         print("# Mean Episode Score : {}".format(mean_score))
         print("# Sum of Episode Scores : {}".format(sum_score))
-        print("# Mean Percentage Cargo Missed over all episodes: {}".format(mean_cargo_percentage_missed))
+        print("# Mean Percentage Cargo Missed over all episodes: {}".format(100*mean_cargo_percentage_missed))
         print("# Mean Normalized Score over all episodes: {}".format(mean_normalized_score))
         print("# Num of Test Folders Completed: {}".format(self.num_tests_completed))
         print("# *** Overall score (sum of Normalized Scores): {} ***".format(sum_normalized_score))
@@ -342,8 +367,25 @@ class LocalEvaluationService:
 
         file = open(self.output_dir + "results_summary_" + str(self.submission_id) + ".csv", "w")
         data = "Mean Evaluation Score, Sum Evaluation Score, Mean Evaluation Score Normalized, Mean Evaluation Percentage Missed Deliveries, Sum of Normalized Evaluation Score, Num Tests Completed \n"
-        data += str(mean_score) + "," + str(sum_score) + "," + str(mean_normalized_score) + "," + str(mean_percentage_missed) + "," + str(sum_normalized_score) + "," + str(self.num_tests_completed)
+        data += str(mean_score) + "," + str(sum_score) + "," + str(mean_normalized_score) + "," + str(
+            mean_percentage_missed) + "," + str(sum_normalized_score) + "," + str(self.num_tests_completed)
         file.write(data)
         file.close()
 
         return mean_score, sum_score, mean_normalized_score, sum_normalized_score, mean_percentage_missed
+
+    def create_scores_file(self):
+        mean_score = np.array(self.simulation_scores).mean()
+        sum_score = np.array(self.simulation_scores).sum()
+        mean_normalized_score = np.array(self.simulation_scores_normalized).mean()
+        mean_percentage_missed = np.array(self.simulation_missed_deliveries).mean()
+        sum_normalized_score = np.array(self.simulation_scores_normalized).sum()
+
+        scores_file = open(self.output_dir + "scores.txt", "w")
+        scores_file.write("MEAN_Score: {:.3f}\n".format(mean_score))
+        scores_file.write("SUM_Score: {:.3f}\n".format(sum_score))
+        scores_file.write("MEAN_Normalized_Score: {:.3f}\n".format(mean_normalized_score))
+        scores_file.write("MEAN_Percent_Missed: {:.3f}\n".format(mean_percentage_missed))
+        scores_file.write("set1_score: {:.3f}\n".format(sum_normalized_score)) # SUM Normalized Score
+        scores_file.write("Duration: {:.3f}\n".format(0))
+        scores_file.close()
