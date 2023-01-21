@@ -161,6 +161,7 @@ class LocalEvaluationService:
                 # If missed threshold was exceeded on last test mark as completing due to too many missed
                 # and do not consider the test complete
                 self.status = Status.STOPPED_TOO_MANY_MISSED
+                self.create_scores_file()
             else:
                 self.status = Status.FINISHED_ALL_SCENARIOS
                 self.num_tests_completed += 1  # Consider the last test complete
@@ -175,6 +176,7 @@ class LocalEvaluationService:
                 if self.exceeded_missed_threshold(self.current_test):
                     evaluation_done = True
                     self.status = Status.STOPPED_TOO_MANY_MISSED
+                    self.create_scores_file()
                 else:
                     self.num_tests_completed += 1
 
