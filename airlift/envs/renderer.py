@@ -46,7 +46,7 @@ class FlatRenderer(EnvRenderer):
     def __init__(self,
                  width_in_pixels=None,
                  height_in_pixels=default_height_in_pixels,
-                 show_routes=False,
+                 show_routes=True,
                  color_planes_by_type=None):
 
         self.out = None
@@ -60,6 +60,8 @@ class FlatRenderer(EnvRenderer):
 
         self.routemap = None
         self.airplanes = None
+
+        self.routewidth = 1
 
         sColors = "ff6d00#2962ff#0091ea#00b8d4#d50000#c51162#aa00ff#6200ea#304ffe#00bfa5#00c853" + \
                   "#64dd17#aeea00#ffd600#ffab00#ff6d00#ff3d00#5d4037#455a64"
@@ -358,7 +360,7 @@ class FlatRenderer(EnvRenderer):
                     coord1 = self.routemap.airports_by_id[u].position
                     coord2 = self.routemap.airports_by_id[v].position
                     draw.line(xy=self._coord_to_pixel(coord1) + self._coord_to_pixel(coord2), fill=self.line_colors[4+i],
-                              width=1)
+                              width=self.routewidth)
 
     def _rgb_s2i(self, sRGB):
         """ convert a hex RGB string like 0091ea to 3-tuple of ints """
