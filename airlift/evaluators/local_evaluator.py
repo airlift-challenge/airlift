@@ -95,7 +95,7 @@ class LocalEvaluationService:
         file = open(self.output_dir + "breakdown_results_" + str(submission_id) + ".csv", "w")
         data = "Filename, Episode Score, Episode Score Normalized, Percentage Cargo Missed," \
                "Total Cost, Average Cost Per Plane, Total Lateness, Average Lateness Per Plane, " \
-               "Total Steps, Average Steps, Total Waiting Steps, Total Time To Complete, Total Malfunctions, " \
+               "Total Steps, Average Steps, Total Waiting Steps, Total Malfunctions, " \
                "Missed Deliveries, Total Rewards For All Agents, Average Rewards For All Agents \n"
         file.write(data)
         file.close()
