@@ -105,8 +105,8 @@ class StaticCargoGenerator(CargoGenerator):
                            source_airport,
                            destination_airport,
                            generate_cargo_weight(),
-                           soft_deadline,
-                           hard_deadline,
+                           soft_deadline+time_available,
+                           hard_deadline+time_available,
                            earliest_pickup_time=time_available)
         source_airport.add_cargo(cargo_task)
         return cargo_task
