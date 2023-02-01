@@ -47,7 +47,9 @@ setup(
     keywords='airlift',
     name='airlift-challenge',
     packages=find_packages('.'),
-    data_files=[],
+    data_files=[
+        ('pngs', ['airlift/envs/png/box.png', 'airlift/envs/png/green_delivered.png', 'airlift/envs/png/plane.png',
+                  'airlift/envs/png/red_missed.png', 'airlift/envs/png/yellow_late.png'])],
     setup_requires=setup_requirements,
     test_suite='tests',
     tests_require=test_requirements,
