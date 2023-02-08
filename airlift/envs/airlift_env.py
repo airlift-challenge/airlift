@@ -691,8 +691,9 @@ class AirliftEnv(ParallelEnv):
     def _build_scen_info_obs(self):
         # These parameters are currently static and do not change throughout a scenario
         # If max working_capacity or processing time ever become dynamic. This observation will have to be changed.
-        return ScenarioObservation(self.world_generator.airport_generator.working_capacity,
-                                   self.world_generator.airport_generator.processing_time)
+        return ScenarioObservation(self.world_generator.airport_generator.processing_time,
+                                   self.world_generator.airport_generator.working_capacity
+                                   )
 
     def _update_state_and_obs(self, new_cargo):
         for plane in self.routemap.plane_types:
