@@ -56,7 +56,7 @@ class Solution:
         return list(obs.values())[0]["globalstate"]  # Assume state space for each agent is the same
 
 
-def doepisode(env, solution, render=False, env_seed=None, solution_seed=None, render_sleep_time=0.1):
+def doepisode(env, solution, render=False, env_seed=None, solution_seed=None, render_sleep_time=0.1, capture_metrics=False):
     """
     Runs a single episode.
 
@@ -75,6 +75,9 @@ def doepisode(env, solution, render=False, env_seed=None, solution_seed=None, re
     step = 0
     _done = False
     obs = env.reset(seed=env_seed)
+    if capture_metrics:
+        step_metrics = [env.metrics]
+
     solution.reset(obs, env.observation_spaces, env.action_spaces, solution_seed)
     episode_starting_time = timeit.default_timer()
     starting_time = timeit.default_timer()
@@ -85,6 +88,9 @@ def doepisode(env, solution, render=False, env_seed=None, solution_seed=None, re
         actions = solution.policies(env.observe(), env.dones)
         total_solution_time += timeit.default_timer() - starting_time
         obs, rewards, dones, _ = env.step(actions)  # If there is no observation, just return 0
+        if capture_metrics:
+            step_metrics.append(env.metrics)
+
         _done = all(dones.values())
         step += 1
         if render:
@@ -93,4 +99,8 @@ def doepisode(env, solution, render=False, env_seed=None, solution_seed=None, re
     # print('is done')
     time_taken = timeit.default_timer() - episode_starting_time
 
-    return env.env_info, env.metrics, time_taken, total_solution_time
+    return_val = (env.env_info, env.metrics, time_taken, total_solution_time)
+    if capture_metrics:
+        return return_val + (step_metrics,)
+    else:
+        return return_val

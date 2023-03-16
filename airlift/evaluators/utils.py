@@ -55,6 +55,25 @@ def doeval(test_folder: Path,
     evaluator.print_stats()
 
 
+def doeval_single_episode(
+           test_pkl_file: Path,
+           env_seed,
+           solution: Solution,
+           solution_seed: int = 123,
+           render=False,
+           render_sleep_time=0.1):
+    env = AirliftEnv.load(test_pkl_file)
+    env_info, metrics, time_taken, total_solution_time, step_metrics = \
+        doepisode(env,
+                  solution=solution,
+                  render=render,
+                  env_seed=env_seed,
+                  solution_seed=solution_seed,
+                  render_sleep_time=render_sleep_time,
+                  capture_metrics=True)
+    return env_info, metrics, time_taken, total_solution_time, step_metrics
+
+
 class ScenarioInfo(NamedTuple):
     testnum: int
     levelnum: int

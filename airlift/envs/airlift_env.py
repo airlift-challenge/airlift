@@ -466,9 +466,9 @@ class AirliftEnv(ParallelEnv):
     def metrics(self):
         """
         Returns metrics collected by the environment.
-        Should be called after the episode is done.
+        Note: some values may be incorrect if this is called before the episode is done.
         """
-        assert all(self.dones.values())
+        #assert all(self.dones.values())
 
         total_cost = sum(item.flight_cost for item in self._agents.values())
 
