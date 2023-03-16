@@ -56,7 +56,7 @@ class Solution:
         return list(obs.values())[0]["globalstate"]  # Assume state space for each agent is the same
 
 
-def doepisode(env, solution, render=False, env_seed=None, solution_seed=None, render_sleep_time=0.1, capture_metrics=False):
+def doepisode(env, solution, render=False, env_seed=None, solution_seed=None, render_sleep_time=0.1, capture_metrics=False, render_mode="human"):
     """
     Runs a single episode.
 
@@ -94,8 +94,9 @@ def doepisode(env, solution, render=False, env_seed=None, solution_seed=None, re
         _done = all(dones.values())
         step += 1
         if render:
-            env.render()
-            time.sleep(render_sleep_time)
+            env.render(render_mode)
+            if render_mode != "video":
+                time.sleep(render_sleep_time)
     # print('is done')
     time_taken = timeit.default_timer() - episode_starting_time
 

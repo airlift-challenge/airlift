@@ -243,10 +243,13 @@ class FlatRenderer(EnvRenderer):
             self.frame_size = (self.widthPx, self.heightPx)
             self.fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
             #self.fourcc = cv2.VideoWriter_fourcc('L', 'A', 'G', 'S')
-            path = ROOT_DIR + "/recordings/" + dt_string + ".wmv"
-            path_exists = os.path.exists(path)
-            if not path_exists:
-                os.makedirs(path)
+            path = "./" + dt_string + ".wmv"
+
+            # # The following code created a folder for the wmv file as well, which caused issues
+            # path = "./recordings/" + dt_string + ".wmv"
+            # path_exists = os.path.exists(path)
+            # if not path_exists:
+            #     os.makedirs(path)
 
             self.out = cv2.VideoWriter(path, self.fourcc, 12.0,
                                        self.frame_size)

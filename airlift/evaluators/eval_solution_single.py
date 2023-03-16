@@ -26,14 +26,18 @@ from solution.mysolution import MySolution
 @click.option('--render/--no-render',
               default=False,
               help='Render the episode')
-def run_evaluation(scenario_file, env_seed, solution_seed, render):
+@click.option('--render-mode',
+              default="human",
+              help='Render mode ("human" or "video")')
+def run_evaluation(scenario_file, env_seed, solution_seed, render, render_mode):
     env_info, metrics, time_taken, total_solution_time, metrics = \
         doeval_single_episode(
-            scenario_file,
-            env_seed,
-            MySolution(),
-            solution_seed,
-            render)
+            test_pkl_file=scenario_file,
+            env_seed=env_seed,
+            solution=MySolution(),
+            solution_seed=solution_seed,
+            render=render,
+            render_mode=render_mode)
 
     timestr = time.strftime("%Y-%m-%d-%H%M%S")
     with open("envinfo_{}.csv".format(timestr), 'w', newline='') as file:
