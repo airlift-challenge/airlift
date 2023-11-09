@@ -105,9 +105,8 @@ def create_scenarios_based_on_test_level(output_path, run_random, run_baseline):
                                                       ),
                                                       route_generator=RouteByDistanceGenerator(
                                                           malfunction_generator=EventIntervalGenerator(
-                                                              malfunction_rate=malfunction_rate,
                                                               min_duration=min_duration,
-                                                              max_duration=max_duration),
+                                                              max_duration=max_duration), poisson_lambda=.04,
                                                           route_ratio=2
                                                       ),
                                                       cargo_generator=DynamicCargoGenerator(
@@ -140,9 +139,8 @@ def create_scenarios_based_on_test_level(output_path, run_random, run_baseline):
                                                       ),
                                                       route_generator=RouteByDistanceGenerator(
                                                           malfunction_generator=EventIntervalGenerator(
-                                                              malfunction_rate=malfunction_rate,
                                                               min_duration=min_duration,
-                                                              max_duration=max_duration),
+                                                              max_duration=max_duration), poisson_lambda=.04,
                                                           route_ratio=2
                                                       ),
                                                       cargo_generator=DynamicCargoGenerator(
@@ -175,9 +173,8 @@ def create_scenarios_based_on_test_level(output_path, run_random, run_baseline):
                                                       ),
                                                       route_generator=RouteByDistanceGenerator(
                                                           malfunction_generator=EventIntervalGenerator(
-                                                              malfunction_rate=malfunction_rate,
                                                               min_duration=min_duration,
-                                                              max_duration=max_duration),
+                                                              max_duration=max_duration), poisson_lambda=.04,
                                                           route_ratio=2
                                                       ),
                                                       cargo_generator=DynamicCargoGenerator(
@@ -210,9 +207,8 @@ def create_scenarios_based_on_test_level(output_path, run_random, run_baseline):
                                                       ),
                                                       route_generator=LimitedDropoffEntryRouteGenerator(
                                                           malfunction_generator=EventIntervalGenerator(
-                                                              malfunction_rate=malfunction_rate,
                                                               min_duration=min_duration,
-                                                              max_duration=max_duration),
+                                                              max_duration=max_duration), poisson_lambda=.04,
                                                           route_ratio=2,
                                                           drop_off_fraction_reachable=0.2,
                                                           pick_up_fraction_reachable=0.2),

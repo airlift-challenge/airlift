@@ -92,14 +92,6 @@ class LocalEvaluationService:
 
         self.episode_step_time_stat = RunningStat()
 
-        file = open(self.output_dir + "breakdown_results_" + str(submission_id) + ".csv", "w")
-        data = "Filename, Episode Score, Episode Score Normalized, Percentage Cargo Missed," \
-               "Total Cost, Average Cost Per Plane, Total Lateness, Average Lateness Per Plane, " \
-               "Total Steps, Average Steps, Total Waiting Steps, Total Malfunctions, " \
-               "Missed Deliveries, Total Rewards For All Agents, Average Rewards For All Agents \n"
-        file.write(data)
-        file.close()
-
     def read_metadata(self):
         df = pd.read_csv(self.test_env_folder + "/metadata.csv")
         for index, row in df.iterrows():
@@ -273,24 +265,39 @@ class LocalEvaluationService:
                 (self.random_scores[self.simulation_count] - self._env.metrics.score) \
                 / (self.random_scores[self.simulation_count] - self.baseline_scores[self.simulation_count])
 
-            file = open(self.output_dir + "breakdown_results_" + str(self.submission_id) + ".csv", "a")
-            data = str(self.env_filenames[self.simulation_count]) + "," \
-                   + str(self.simulation_scores[self.simulation_count]) \
-                   + "," + str(self.simulation_scores_normalized[self.simulation_count]) \
-                   + "," + str(self.simulation_missed_deliveries[self.simulation_count]) \
-                   + "," + str(self._env.metrics.total_cost) \
-                   + "," + str(self._env.metrics.average_cost_per_plane) \
-                   + "," + str(self._env.metrics.total_lateness) \
-                   + "," + str(self._env.metrics.average_lateness_per_plane) \
-                   + "," + str(self._env.metrics.total_steps) \
-                   + "," + str(self._env.metrics.average_steps) \
-                   + "," + str(self._env.metrics.total_waiting_steps) \
-                   + "," + str(self._env.metrics.total_malfunctions) \
-                   + "," + str(self._env.metrics.missed_deliveries) \
-                   + "," + str(self._env.metrics.total_rewards_for_all_agents) \
-                   + "," + str(self._env.metrics.average_rewards_for_all_agents) + "\n"
+            if self.simulation_count == 0:
+                file = open(self.output_dir + "breakdown_results.csv", "w")
+                data = "Filename, "
+                for name in zip(self._env.metrics._fields):
+                    data += str(name[0]) + ","
+                data += "\n"
+                file.write(data)
+                file.close()
+
+            file = open(self.output_dir + "breakdown_results.csv", "a")
+            data = str(self.env_filenames[self.simulation_count]) + ","
+
+            for i in range(len(self._env.metrics)):
+                data += str(self._env.metrics[i]) + ","
+            data += "\n"
             file.write(data)
             file.close()
+            #data = str(self.env_filenames[self.simulation_count]) + "," \
+            #       + str(self.simulation_scores[self.simulation_count]) \
+            #       + "," + str(self.simulation_scores_normalized[self.simulation_count]) \
+            #       + "," + str(self.simulation_missed_deliveries[self.simulation_count]) \
+            #       + "," + str(self._env.metrics.total_cost) \
+            #       + "," + str(self._env.metrics.average_cost_per_plane) \
+            #       + "," + str(self._env.metrics.total_lateness) \
+            #       + "," + str(self._env.metrics.average_lateness_per_plane) \
+            #       + "," + str(self._env.metrics.total_steps) \
+            #       + "," + str(self._env.metrics.average_steps) \
+            #       + "," + str(self._env.metrics.total_waiting_steps) \
+            #       + "," + str(self._env.metrics.total_malfunctions) \
+            #       + "," + str(self._env.metrics.missed_deliveries) \
+            #       + "," + str(self._env.metrics.total_rewards_for_all_agents) \
+            #       + "," + str(self._env.metrics.average_rewards_for_all_agents) + "\n"
+
 
             if self.current_test not in self.simulation_percentage_missed_per_test:
                 self.simulation_percentage_missed_per_test[self.current_test] = []

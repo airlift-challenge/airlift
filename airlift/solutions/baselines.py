@@ -1,10 +1,9 @@
+import random
+
 import networkx as nx
 from networkx import NetworkXNoPath
-from ordered_set import OrderedSet
-
-from airlift.envs.airlift_env import ObservationHelper as oh, ActionHelper, NOAIRPORT_ID
+from airlift.envs.airlift_env import ObservationHelper as oh, ActionHelper, NOAIRPORT_ID, ObservationHelper
 from airlift.solutions import Solution
-
 
 
 # Random agent which chooses only valid actions
@@ -24,225 +23,286 @@ class ShortestPath(Solution):
     def __init__(self):
         super().__init__()
 
+        self.cargo_delivered = None
+        self._full_delivery_paths = None
+        self.multidigraph = None
+        self.multi_view = None
         self.cargo_assignments = None
         self.path = None
-        self.whole_path = None
+        self.plane_graph = None
+        self.view = None
+        self.plane_types = []
 
     def reset(self, obs, observation_spaces=None, action_spaces=None, seed=None):
         super().reset(obs, observation_spaces, action_spaces, seed)
-        state = self.get_state(obs)
 
         self.cargo_assignments = {a: None for a in self.agents}
         self.path = {a: None for a in self.agents}
-        self.whole_path = {a: None for a in self.agents}
-        self.multidigraph = oh.get_multidigraph(state)
-
+        self.view = {}
         self._full_delivery_paths = {}
+        self.cargo_delivered = {a: [] for a in self.agents}
 
     def policies(self, obs, dones):
+        actions = {}
         state = self.get_state(obs)
 
-        # Active cargo list should not have any delivered cargo
-        assert all(c.location != c.destination for c in state["active_cargo"])
+        # Build views in-case of malfunctions
+        self.build_multidigraph_view(state)
+        self.build_agent_views(obs, state)
 
-        # Since shortest paths calculation take most of the time, let's keep track of delivery paths, since these won't change.
-        # We need to update this list with any dynamic cargo that appears.
-        for c in state["active_cargo"]:
-            if c.location != NOAIRPORT_ID and c.id not in self._full_delivery_paths:
-                self._full_delivery_paths[c.id] = nx.shortest_path(self.multidigraph, c.location, c.destination, weight="cost")[1:]
+        # Create full delivery path for all active cargo
+        self.get_initial_full_delivery_path(state)
+        pending_cargo = self.get_active_cargo_from_state(state)
 
-        # Cargo needing to be delivered that is not assigned yet (sorted to make it deterministic)
-        pending_cargo = [c for c in state["active_cargo"] if c.id not in self.cargo_assignments.values() and c.is_available == 1]
+        # Create our cargo bins
+        cargo_bins = self.separate_cargo_by_location_and_destination(pending_cargo)
+
+        # Generate an initial plan of action
+        self.get_initial_agent_actions(obs, state, dones, pending_cargo, cargo_bins)
+        actions.update(self.plan(obs))
+
+        # Use ActionHelper and ObservationHelper to update the action again in-case of non-valid entries.
+        self.check_for_valid_actions(obs, state, actions)
+
+        return actions
+
+    def plan(self, obs):
+        state = self.get_state(obs)
         actions = {a: None for a in self.agents}
 
         for a in self.agents:
-            # If the agent is done, stop issuing actions for it
 
-            if dones[a]:
-                continue
-
-            # If the airplane has a cargo assignment...
-            if self.cargo_assignments[a] is not None:
-                # Has it been delivered?
-                if self.cargo_assignments[a] not in [c.id for c in state["active_cargo"]]:
-                    # Unassign it
-                    self.cargo_assignments[a] = None
-
-            # If the airplane needs a new assignment...
-            if pending_cargo and self.cargo_assignments[a] is None:
-                # Check if there is any cargo needing to be delivered that is not assigned yet
-                cargo_info = pending_cargo[self._np_random.choice(range(len(pending_cargo)))]
-
-                if cargo_info.location != NOAIRPORT_ID:
-                    full_delivery_path = self._full_delivery_paths[cargo_info.id]
-                    try:
-                        # Check if we should pick up this cargo...
-                        # Can we make any progress after pickup? If not, move on to next cargo...
-                        if not self.multidigraph.has_edge(cargo_info.location, full_delivery_path[0], obs[a]['plane_type']):
-                            continue
-
-                        # Generate a pickup path. If we can't reach the cargo, this will throw an exception
-                        path = oh.get_lowest_cost_path(state, obs[a]["current_airport"],
-                                                               cargo_info.location,
-                                                               obs[a]["plane_type"])
-
-                        # If we made it here, we should pick this cargo up. Complete the path to the dropoff location...
-                        # Follow the full delivery path until we can't go further.
-                        while full_delivery_path and self.multidigraph.has_edge(path[-1], full_delivery_path[0], obs[a]['plane_type']):
-                            path.append(full_delivery_path.pop(0))
-
-                        # Make the assignment
-                        self.path[a] = path
-                        self.cargo_assignments[a] = cargo_info.id
-                        pending_cargo.remove(cargo_info)
-
-                        # Once we have found a cargo and assigned it, we can break out of this loop.
-                        break
-
-                    except NetworkXNoPath as e:
-                        # If there is no path, to pick up and/or deliver, don't complete the assignment
-                        pass
-
-            # If the plane is idle, assign a new action
-            # We only assign an action while idle. If we try to assign a new action while the plane is not idle, we could hit on some glitches
-            if oh.is_airplane_idle(obs[a]):
-                actions[a] = {"process": 1,
+            if oh.needs_orders(obs[a]):
+                actions[a] = {"priority": 1,
                               "cargo_to_load": set(),
                               "cargo_to_unload": set(),
                               "destination": NOAIRPORT_ID}
 
-                # If we have a path to follow, set next destination and takeoff when ready
                 if self.path[a]:
                     next_destination = self.path[a][0]
 
-                    # Have we arrived at the next destination? Pop that one off and set the next one in the list.
                     if obs[a]["current_airport"] == next_destination:
                         self.path[a].pop(0)
                         if self.path[a]:
                             next_destination = self.path[a][0]
-                        else:
-                            next_destination = NOAIRPORT_ID
 
                     actions[a]["destination"] = next_destination
-
-                # Get info about the currently assigned cargo
                 ca = oh.get_active_cargo_info(state, self.cargo_assignments[a])
-                # If cargo is assigned
-
                 if ca is not None:
-                    if ca.id in obs[a]["cargo_onboard"]:
-                        # If you're at final destination unload cargo or you have reached the end of your possible paths
-                        if ca.destination == obs[a]['current_airport'] or not self.path[a]:
-                            actions[a]["cargo_to_unload"].add(ca.id)
-                            self.cargo_assignments[a] = None
-                    elif ca.id in obs[a]['cargo_at_current_airport']:
-                        actions[a]["cargo_to_load"].add(ca.id)
+                    if ca[0].id in obs[a]["cargo_onboard"]:
+                        for cargo in ca:
+                            if cargo.destination == obs[a]['current_airport'] or len(self.path[a]) == 0:
+                                actions[a]["cargo_to_unload"].add(cargo.id)
+                                # self.cargo_assignments[a].remove(cargo) <--Breaks things for some reason..
+                                # Just setting it to None seems to fix it, but can't even set it to None outside the loop...
+                                self.cargo_assignments[a] = None
+
+                    elif ca[0].id in obs[a]['cargo_at_current_airport']:
+                        assert ca[0].destination != obs[a]['current_airport']
+                        for cargo in ca:
+                            if cargo.id not in self.cargo_delivered[a]:
+                                actions[a]["cargo_to_load"].add(cargo.id)
+                                self.cargo_delivered[a].append(cargo.id)
 
         return actions
 
-class ShortestPath_AllReachable(Solution):
-    def __init__(self):
-        super().__init__()
+    def build_agent_views(self, obs, state):
+        if not self.plane_types:
+            for a in self.agents:
+                if obs[a]['plane_type'] not in self.plane_types:
+                    self.plane_types.append(obs[a]['plane_type'])
 
-        self.cargo_assignments = None
-        self.paths = None
+        # Add the subgraph view for each plane_type
+        for plane_type in self.plane_types:
+            self.view[plane_type] = nx.subgraph_view(state["route_map"][plane_type],
+                                                     filter_edge=self.filter_edge)
 
-    def reset(self, obs, observation_spaces=None, action_spaces=None, seed=None):
-        super().reset(obs, observation_spaces, action_spaces, seed)
-        state = self.get_state(obs)
+    def build_multidigraph_view(self, state):
+        self.multidigraph = oh.get_multidigraph(state)
+        self.multi_view = nx.subgraph_view(self.multidigraph, filter_edge=self.filter_multi_graph_edge)
 
-        self.cargo_assignments = {a: None for a in self.agents}
-        self.paths = {a: None for a in self.agents}
-
-        # At least one airplane needs to be able reach the entire graph
-      #  assert any(nx.is_strongly_connected(G) for G in state["route_map"].values())
-
-    def policies(self, obs, dones):
-        state = self.get_state(obs)
-
-        # Active cargo list should not have any delivered cargo
+    def get_initial_full_delivery_path(self, state):
         assert all(c.location != c.destination for c in state["active_cargo"])
+        for c in state["active_cargo"]:
+            if c.location != NOAIRPORT_ID and c.id not in self._full_delivery_paths:
+                try:
+                    self._full_delivery_paths[c.id] = nx.shortest_path(self.multi_view, c.location, c.destination,
+                                                                       weight="cost")[1:]
+                except nx.NetworkXNoPath as e:
+                    continue
 
-        # Cargo needing to be delivered that is not assigned yet
-        pending_cargo = {c.id for c in state["active_cargo"] if c.id not in self.cargo_assignments.values()}
+    def get_active_cargo_from_state(self, state):
+        pending_cargo = [c for c in state["active_cargo"] if
+                         c.id not in self.cargo_assignments.values() and c.is_available == 1]
+        return pending_cargo
 
-        actions = {a: None for a in self.agents}
+    def separate_cargo_by_location_and_destination(self, cargo_list):
 
+        cargo_bins = {}
+
+        for cargo_item in cargo_list:
+            location = cargo_item.location
+            destination = cargo_item.destination
+            key = (location, destination)
+
+            if key not in cargo_bins:
+                cargo_bins[key] = []
+            if cargo_item.is_available:
+                cargo_bins[key].append(cargo_item)
+
+        return cargo_bins
+
+    def select_cargo(self, cargo_bins):
+        keys_list = list(cargo_bins.keys())
+        random_key_from_list = random.choice(keys_list)
+        cargo_info = cargo_bins[random_key_from_list]
+
+        return random_key_from_list, cargo_info
+
+    def get_initial_agent_actions(self, obs, state, dones, pending_cargo, cargo_bins):
+        active_cargo_ids = [c.id for c in pending_cargo]
         for a in self.agents:
-            # If the agent is done, stop issuing actions for it
+            plane_type = obs[a]['plane_type']
+            self.plane_graph = state["route_map"][plane_type]
+
+            # Create a copy of the cargo assignments and remove anything that shouldn't be there
+            if self.cargo_assignments[a] is not None:
+                cargo_copy = list(self.cargo_assignments[a])
+                for cargo in cargo_copy:
+                    if cargo not in active_cargo_ids:
+                        self.cargo_assignments[a].remove(cargo)
+
             if dones[a]:
                 continue
 
-            # If the airplane has a cargo assignment...
-            if self.cargo_assignments[a] is not None:
-                # Has it been delivered?
-                if self.cargo_assignments[a] not in [c.id for c in state["active_cargo"]]:
-                    # Unassign it
-                    self.cargo_assignments[a] = None
-
-            # If the airplane needs a new assignment...
-            if self.cargo_assignments[a] is None:
-                # Check if there is any cargo needing to be delivered that is not assigned yet
-
-                if pending_cargo:
-                    # Get a cargo at random
-                    cargo_info = oh.get_active_cargo_info(state, self._np_random.choice(list(pending_cargo)))
-
-                    # Generate a pickup and delivery path and assign the cargo
-                    # Note that paths include the starting location - so we ignore element 0 of each path
-                    try:
-                        self.paths[a] = \
-                            oh.get_lowest_cost_path(state, obs[a]["current_airport"], cargo_info.location,
-                                                    obs[a]["plane_type"])[1:] \
-                            + oh.get_lowest_cost_path(state, cargo_info.location, cargo_info.destination,
-                                                      obs[a]["plane_type"])[1:]
-                        self.cargo_assignments[a] = cargo_info.id
-                        pending_cargo.remove(cargo_info.id)
-                    except NetworkXNoPath as e:
-                        # Is there is no path, to pick up and/or deliver, don't complete the assignment
-                        pass
-
-            # If the plane is idle, assign a new action
-            # We only assign an action while idle. If we try to assign a new action while the plane is not idle, we could hit on some glitchy edge cases
-            if oh.is_airplane_idle(obs[a]):
-                actions[a] = {"process": 1,
-                              "cargo_to_load": set(),
-                              "cargo_to_unload": set(),
-                              "destination": NOAIRPORT_ID}
-                # If we have a path to follow, set next destination and takeoff when ready
-                if self.paths[a]:
-                    next_destination = self.paths[a][0]
-
-                    # Have we arrived at the next destination? Pop that one off and set the next one in the list.
-                    if obs[a]["current_airport"] == next_destination:
-                        self.paths[a].pop(0)
-                        if self.paths[a]:
-                            next_destination = self.paths[a][0]
+            if pending_cargo and self.cargo_assignments[a] is None:
+                # Select cargo info and return the randomly selected key (loc, dest) pair.
+                key, cargo_info = self.select_cargo(cargo_bins)
+                if cargo_info[0].id not in self.cargo_delivered[a]:
+                    if cargo_info[0].location != NOAIRPORT_ID:
+                        if cargo_info[0].id in self._full_delivery_paths:
+                            full_delivery_path = self._full_delivery_paths[cargo_info[0].id]
                         else:
-                            next_destination = NOAIRPORT_ID
+                            try:
+                                full_delivery_path = nx.shortest_path(self.multi_view, cargo_info[0].location,
+                                                                      cargo_info[0].destination,
+                                                                      weight="cost")  # [1:]
+                            except NetworkXNoPath as e:
+                                continue
+                        try:
+                            if full_delivery_path:
+                                if not self.view[plane_type].has_edge(cargo_info[0].location, full_delivery_path[0]
+                                                                      ):
+                                    continue
+                                path = oh.get_lowest_cost_path(self.view[plane_type], obs[a]["current_airport"],
+                                                               cargo_info[0].location,
+                                                               obs[a]["plane_type"])
 
-                    actions[a]["destination"] = next_destination
+                                while full_delivery_path and self.view[plane_type].has_edge(path[-1],
+                                                                                            full_delivery_path[0],
+                                                                                            ):
+                                    path.append(full_delivery_path.pop(0))
+                                self.path[a] = path
 
-                # Get info about the currently assigned cargo
-                ca = oh.get_active_cargo_info(state, self.cargo_assignments[a])
+                                # Get the airplanes max carrying capacity and assign it cargo
+                                max_airplane_weight = obs[a]['max_weight']
+                                num_cargo_assigned = 0
+                                assigned_cargo = []
+                                cargo_info_copy = list(cargo_info)
+                                for cargo in cargo_info_copy:
+                                    assigned_cargo.append(cargo.id)
+                                    pending_cargo.remove(cargo)
+                                    num_cargo_assigned += 1
+                                    cargo_info.remove(cargo)
 
-                # If cargo is assigned
-                if ca is not None:
-                    # If we have the cargo onboard and we're at the destination, unload
-                    if ca.id in obs[a]["cargo_onboard"]:
-                        if ca.destination == obs[a][
-                            'current_airport']:  # Will this update after the airplane takes off?
-                            assert not self.paths[a]  # There shouldn't be a path since we are done
-                            actions[a]["cargo_to_unload"].add(ca.id)
-                        else:
-                            assert self.paths[a]  # There should be a path set to finish the delivery
-                    # If the cargo is at this location, load it
-                    elif ca.id in obs[a]['cargo_at_current_airport']:
-                        assert self.paths[a]  # There should be a delivery path set already
+                                    # Ideally break out of this loop right as we reach the max airplane weight. but I've
+                                    # been getting better results just assigning all of them.
+                                    if num_cargo_assigned == max_airplane_weight:
+                                        continue
+                                    # break
 
-                        # If the cargo was delivered, it should have been unassigned already before we get here - but let's make sure
-                        assert ca.destination != obs[a]['current_airport']
-                        actions[a]["cargo_to_load"].add(ca.id)
+                                # Delete the key value if there are no more cargo in this bin, so we don't select it anymore
+                                # during the next iteration
+                                if not cargo_info:
+                                    del cargo_bins[key]
 
+                                self.cargo_assignments[a] = assigned_cargo
 
-        return actions
+                                # If there are no more bins to assign, break out of the loop
+                                if not cargo_bins:
+                                    break
+
+                        except NetworkXNoPath as e:
+                            continue
+
+    def create_path_and_update_action(self, obs, a, cargo_info, full_delivery_path, actions):
+        plane_type = obs[a]['plane_type']
+
+        # If we can't make any progress
+        if not self.view[plane_type].has_edge(cargo_info[0].location, full_delivery_path[0]):
+            return False
+
+        path = oh.get_lowest_cost_path(self.view[plane_type], obs[a]["current_airport"],
+                                       cargo_info[0].destination,
+                                       obs[a]["plane_type"])
+
+        while full_delivery_path and self.view[plane_type].has_edge(path[-1], full_delivery_path[0]):
+            path.append(full_delivery_path.pop(0))
+
+        self.path[a] = path
+        actions[a].destination = self.path[a].pop()
+        actions[a]['cargo_to_unload'].add(cargo_info.id)
+
+    def get_full_delivery_path_by_cargo_info(self, obs, cargo_info):
+        self._full_delivery_paths[cargo_info[0].id] = nx.shortest_path(self.multi_view,
+                                                                       obs['current_airport'],
+                                                                       cargo_info[0].destination,
+                                                                       weight="cost")[1:]
+
+        for cargo in cargo_info:
+            if cargo is not None:
+                self._full_delivery_paths[cargo.id] = self._full_delivery_paths[cargo_info[0].id]
+
+        return self._full_delivery_paths[cargo_info[0].id]
+
+    def check_for_valid_actions(self, obs, state, actions):
+        for a in self.agents:
+            valid = ActionHelper.is_action_valid(actions[a], obs[a])
+            if not valid[0]:
+                cargo_info = ObservationHelper.get_cargo_objects(state, obs[a]['cargo_onboard'])
+                if cargo_info:
+                    if cargo_info[0] is not None:
+                        try:
+                            full_delivery_path = self.get_full_delivery_path_by_cargo_info(obs[a], cargo_info)
+                        except NetworkXNoPath as e:
+                            continue
+
+                        if full_delivery_path:
+                            try:
+                                if not self.create_path_and_update_action(obs, a, cargo_info, full_delivery_path,
+                                                                          actions):
+                                    continue
+
+                            except NetworkXNoPath as e:
+                                continue
+
+    def filter_edge(self, u, v):
+        """Filter DiGraph, used for Airplane Types graphs"""
+        return self.plane_graph[u][v]["mal"] == 0
+
+    # Filter a multidigraph
+
+    def filter_multi_graph_edge(self, u, v, key):
+        """Filter the MultiDiGraph (created from collection of DiGraphs)"""
+        return self.multidigraph[u][v][key]['mal'] == 0
+
+    # Check to see if the subgraph edges/nodes exist in the multigraph for our assertion
+    def is_subgraph_of_multigraph(self, subgraph, multigraph):
+        """Not utilized, but can be used to assert that the newly created views are subgraphs of the multi di graph"""
+        if not set(subgraph.nodes).issubset(set(multigraph.nodes)):
+            return False
+
+        for u, v, data in subgraph.edges(data=True):
+            if not multigraph.has_edge(u, v):
+                return False
+        return True

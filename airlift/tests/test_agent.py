@@ -22,7 +22,7 @@ def env():
 
 @pytest.fixture
 def env_with_malfunctions():
-    return generate_environment(num_of_agents=1, cargo_generator=StaticCargoGenerator(1, 100, 150), num_of_airports=3, malfunction_generator=EventIntervalGenerator(malfunction_rate=1 / 5, min_duration=1, max_duration=2))
+    return generate_environment(num_of_agents=1, cargo_generator=StaticCargoGenerator(1, 100, 150), num_of_airports=3, malfunction_generator=EventIntervalGenerator(min_duration=1, max_duration=2))
 
 
 def check_reward(env, a):

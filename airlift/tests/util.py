@@ -1,4 +1,4 @@
-from airlift.envs import AirliftEnv, AirliftWorldGenerator, PlaneType
+from airlift.envs import AirliftEnv, AirliftWorldGenerator, PlaneType, FlatRenderer
 from airlift.envs import StaticCargoGenerator
 from airlift.envs import NoEventIntervalGen
 from airlift.envs import AirplaneGenerator
@@ -13,6 +13,7 @@ def generate_environment(num_of_airports: int = 5,
                          make_drop_off_area=False,
                          make_pick_up_area=False,
                          malfunction_generator=NoEventIntervalGen(),
+                         poisson_lambda=0,
                          cargo_generator=StaticCargoGenerator(1),
                          plane_types=[PlaneType(id=0, model='A0', max_range=2.0, speed=0.1, max_weight=5)]):
     return AirliftEnv(
@@ -25,8 +26,9 @@ def generate_environment(num_of_airports: int = 5,
                                                      make_pick_up_area=make_pick_up_area,
                                                      num_drop_off_airports=1,
                                                      num_pick_up_airports=1),
-            route_generator=RouteByDistanceGenerator(malfunction_generator=malfunction_generator),
+            route_generator=RouteByDistanceGenerator(malfunction_generator=malfunction_generator, poisson_lambda=poisson_lambda),
             cargo_generator=cargo_generator,
             airplane_generator=AirplaneGenerator(num_of_agents),
-        )
+        ),
+        renderer=FlatRenderer(show_routes=False)
     )

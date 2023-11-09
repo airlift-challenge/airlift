@@ -14,6 +14,7 @@ import multiprocessing
 from airlift.envs import AirliftEnv
 from airlift.solutions import doepisode
 from airlift.solutions.baselines import RandomAgent, ShortestPath
+from airlift.evaluators.client import RemoteClient
 
 
 def doeval(test_folder: Path,
@@ -54,6 +55,45 @@ def doeval(test_folder: Path,
     print(evaluator.submit())
     evaluator.print_stats()
 
+def doremoteeval(test_folder: Path,
+           solution: Solution,
+           start_solution_seed: int=123,
+           remote_port: int=6379):
+    evaluator = RemoteClient(test_env_folder=str(test_folder),
+                                     remote_port=remote_port)
+
+    solution_seed = start_solution_seed
+    episode = 0
+    observation = True
+    while observation:
+        observation, info, status = evaluator.env_create()
+        if status == Status.FINISHED_ALL_SCENARIOS:
+            # When evaluation is complete, the evaluator responds false for the observation
+            print("Evaluation Complete")
+            break
+        elif status == Status.STOPPED_TOO_MANY_MISSED:
+            print("Evaluation Ended due to too many missed cargo.")
+            break
+        print("Episode : {}".format(episode))
+        episode += 1
+
+        solution.reset(observation, seed=solution_seed)
+
+        dones = {a: False for a in observation.keys()} # For the first step assume agents are not done
+        while True:
+            action = solution.policies(observation, dones)
+
+            observation, all_rewards, dones, info = evaluator.env_step(action)
+            if all(dones.values()):
+                print("Episode {} Done".format(episode))
+                break
+
+        solution_seed += 1
+
+    #if status == Status.FINISHED_ALL_SCENARIOS:
+    print("Evaluation Complete...")
+    print(evaluator.submit())
+    evaluator.print_stats()
 
 def doeval_single_episode(
            test_pkl_file: Path,

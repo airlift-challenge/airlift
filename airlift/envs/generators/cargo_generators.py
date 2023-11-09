@@ -40,7 +40,7 @@ class CargoGenerator:
     def generate_initial_orders(self) -> set:
         raise NotImplementedError
 
-    def generate_dynamic_orders(self, elapsed_steps) -> List[Cargo]:
+    def generate_dynamic_orders(self, elapsed_steps, max_cycles) -> List[Cargo]:
         return []
 
     def will_generate_more_cargo(self):
@@ -81,7 +81,7 @@ class StaticCargoGenerator(CargoGenerator):
         return {self.generate_cargo_order(i, self.routemap.drop_off_airports, self.routemap.pick_up_airports) for i in
                 range(self.num_initial_tasks)}
 
-    def generate_dynamic_orders(self, elapsed_steps) -> List[Cargo]:
+    def generate_dynamic_orders(self, elapsed_steps, max_cycles) -> List[Cargo]:
         return []
 
     def generate_cargo_order(self, cargo_id, drop_off_airports: OrderedSet[Airport],
@@ -105,8 +105,8 @@ class StaticCargoGenerator(CargoGenerator):
                            source_airport,
                            destination_airport,
                            generate_cargo_weight(),
-                           soft_deadline+time_available,
-                           hard_deadline+time_available,
+                           soft_deadline + time_available,
+                           hard_deadline + time_available,
                            earliest_pickup_time=time_available)
         source_airport.add_cargo(cargo_task)
         return cargo_task
@@ -135,8 +135,10 @@ class StaticCargoGenerator(CargoGenerator):
         unit_deadline = ((self._processing_time + 1) * self.avg_hops + self.avg_flighttime) + \
                         ((self._processing_time + 1) * shortest_path_hops + shortest_path_flighttime)
 
-        return round(self.soft_deadline_multiplier * unit_deadline), \
-               round(self.hard_deadline_multiplier * unit_deadline)
+        soft_deadline = round(self.soft_deadline_multiplier * unit_deadline)
+        hard_deadline = round(self.hard_deadline_multiplier * unit_deadline)
+
+        return soft_deadline, hard_deadline
 
 
 class DynamicCargoGenerator(StaticCargoGenerator):
@@ -155,7 +157,7 @@ class DynamicCargoGenerator(StaticCargoGenerator):
         self.max_cargo_per_episode = max_cargo_to_create + num_initial_tasks
         self.eventgen = EventGenerator(self.cargo_creation_rate)
 
-    def generate_dynamic_orders(self, elapsed_steps) -> List[Cargo]:
+    def generate_dynamic_orders(self, elapsed_steps, max_cycles) -> List[Cargo]:
         """
         The EventGenerator controls whether a new dynamic cargo is generated or not using poisson distribution. Makes sure that
         the upperbound limit of max cargo generated per episode is also adhered to.
@@ -163,8 +165,13 @@ class DynamicCargoGenerator(StaticCargoGenerator):
         :return: `cargo_task` : a List that contains a single Cargo or an empty list if no cargo was generated
 
         """
+
+        # If we are up to 90% finished with max_cycles, stop generating more dynamic cargo.
+        # Cargo may be generated that is impossible to complete.
+        threshold_reached = elapsed_steps > (max_cycles * .9)
+
         if self.eventgen.generate() and \
-                self.current_cargo_count < self.max_cargo_per_episode:
+                self.current_cargo_count < self.max_cargo_per_episode and not threshold_reached:
             cargo_task = self.generate_cargo_order(self.current_cargo_count,
                                                    self.routemap.drop_off_airports,
                                                    self.routemap.pick_up_airports,
@@ -174,6 +181,8 @@ class DynamicCargoGenerator(StaticCargoGenerator):
                 self.max_cargo_per_episode))
 
             return [cargo_task]
+
+
 
         return []
 
@@ -240,8 +249,8 @@ class EarliestPickupCargoGenerator(StaticCargoGenerator):
                            destination_airport,
                            generate_cargo_weight(),
                            # Add time_available to the deadlines
-                           soft_deadline+time_available,
-                           hard_deadline+time_available,
+                           soft_deadline + time_available,
+                           hard_deadline + time_available,
                            earliest_pickup_time=time_available)
         source_airport.add_cargo(cargo_task)
         return cargo_task

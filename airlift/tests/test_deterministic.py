@@ -58,9 +58,8 @@ def gen_env():
             ),
             route_generator=RouteByDistanceGenerator(
                 malfunction_generator=EventIntervalGenerator(
-                    malfunction_rate=1 / 300,
                     min_duration=10,
-                    max_duration=100),
+                    max_duration=100), poisson_lambda=.05,
                 route_ratio=2
             ),
             cargo_generator=DynamicCargoGenerator(
@@ -126,5 +125,6 @@ def run_in_parallel(env1, env2, solution1, solution2):
                      delayed(run_with_history)(env2, solution2)])
 
     assert_histories_equal(histories[0], histories[1])
+
 
 

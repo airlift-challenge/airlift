@@ -48,5 +48,4 @@ The development team consists of:
 This competition and code-base was heavily influenced by the [Flatland challenge](https://gitlab.aicrowd.com/flatland/flatland/), and incorporates some structure and code fragments from this competition.
 We are grateful to the [companies and people](https://gitlab.aicrowd.com/flatland/flatland/#-credits) that created this great open source environment. 
 
-Distribution Statement A: Approved for Public Release; Distribution Unlimited:
-Case Number: AFRL-2022-5074, CLEARED on 19 Oct 2022
+Distribution Statement A: Approved for Public Release; Distribution Unlimited: Case Number: AFRL-2023-5590, CLEARED on 03 Nov 2023

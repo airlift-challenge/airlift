@@ -11,6 +11,7 @@ import networkx as nx
 from PIL.Image import Image
 from gym import logger, Space
 from gym.utils import seeding
+from networkx import DiGraph
 from pettingzoo.utils.env_logger import EnvLogger
 
 from airlift.envs.plane_types import PlaneTypeID
@@ -75,6 +76,8 @@ Metrics = namedtuple('Metrics',
                       'dynamic_cargo_generated'
                       ])
 
+NUM_PRIORITIES = 10
+
 
 class PlaneTypeObservation(NamedTuple):
     """Airplane type info for Observation. This is part of the state space"""
@@ -93,9 +96,11 @@ class CargoObservation(NamedTuple):
     soft_deadline: int
     hard_deadline: int
 
+
 class ScenarioObservation(NamedTuple):
     processing_time: int
     working_capacity: int
+
 
 class AirliftEnv(ParallelEnv):
     """Controls all aspects of the simulation/environment.
@@ -213,7 +218,7 @@ class AirliftEnv(ParallelEnv):
         self.dones = {a: False for a in self.agents}
         self.info = {a: {"warnings": []} for a in self.agents}
         self.next_actions = {a: ActionHelper.noop_action() for a in self.agents}
-
+        self.next_actions = self.check_priority_for_none(self.next_actions)
         # Fill in the state graph which we return in the observation
         # We maintain this to avoid performance hit on building the dictionary
         self._state = {"route_map": {},
@@ -287,6 +292,8 @@ class AirliftEnv(ParallelEnv):
         if actions is None:
             actions = {a: None for a in self.agents}
 
+        actions = self.check_priority_for_none(actions)
+
         if TEST_MODE:
             action_valid = ActionHelper.are_actions_valid(actions, self.observe())[0]
             if not action_valid:
@@ -303,7 +310,7 @@ class AirliftEnv(ParallelEnv):
         self.routemap.step()
 
         # Generate Dynamic Cargo
-        new_cargo = self.world_generator.cargo_generator.generate_dynamic_orders(self._elapsed_steps)
+        new_cargo = self.world_generator.cargo_generator.generate_dynamic_orders(self._elapsed_steps, self.max_cycles)
         self._add_cargo(new_cargo)
 
         for i in self.agents:
@@ -316,7 +323,7 @@ class AirliftEnv(ParallelEnv):
                 action = actions[i]
 
             if TEST_MODE and not self.action_space(i).contains(action):
-                action = ActionHelper.noop_action()
+                # action = ActionHelper.noop_action()
                 EnvLogger.warn_action_out_of_bound(action, self.action_space(i), action)
 
             updated_action, self.info[i]["warnings"] = agent.step(action, self.cargo_by_id, self._elapsed_steps)
@@ -341,12 +348,14 @@ class AirliftEnv(ParallelEnv):
         for cargo in self.cargo:
             if self.cargo_missed(cargo):
                 if self._elapsed_steps == cargo.hard_deadline + 1:
-                    # We incur a penalty the moment the delivery is missed
-                    self.rewards[i] -= self.REWARD_CARGO_MISSED_PENALTY
+                    for i in self.agents:
+                        # We incur a penalty the moment the delivery is missed
+                        self.rewards[i] -= self.REWARD_CARGO_MISSED_PENALTY
             elif self._elapsed_steps > cargo.soft_deadline:
-                # We haven't missed the hard deadline, but we are past the soft deadline.
-                # Incur a penalty for each step the delivery is late
-                self.rewards[i] -= self.REWARD_CARGO_LATE_PENALTY
+                for i in self.agents:
+                    # We haven't missed the hard deadline, but we are past the soft deadline.
+                    # Incur a penalty for each step the delivery is late
+                    self.rewards[i] -= self.REWARD_CARGO_LATE_PENALTY
 
         # Calculate dones
         if self._elapsed_steps >= self.max_cycles:
@@ -396,6 +405,14 @@ class AirliftEnv(ParallelEnv):
                self.rewards, \
                self.dones, \
                self.info
+
+    def check_priority_for_none(self, actions):
+        for i in self.agents:
+            agent = self._agents[i]
+
+            if actions[i] is not None and actions[i]['priority'] is None:
+                actions[i]['priority'] = agent.priority
+        return actions
 
     def cargo_lateness(self, cargo):
         if self.cargo_missed(cargo):
@@ -468,7 +485,7 @@ class AirliftEnv(ParallelEnv):
         Returns metrics collected by the environment.
         Note: some values may be incorrect if this is called before the episode is done.
         """
-        #assert all(self.dones.values())
+        # assert all(self.dones.values())
 
         total_cost = sum(item.flight_cost for item in self._agents.values())
 
@@ -554,7 +571,7 @@ class AirliftEnv(ParallelEnv):
             min_degree=min_degree,
             max_degree=max_degree,
             avg_degree=mean_degree,
-            malfunction_rate=self.world_generator.route_generator.malfunction_generator.malfunction_rate,
+            malfunction_rate=self.routemap.poisson_dist.lambda_value,
             malfunction_max_steps=self.world_generator.route_generator.malfunction_generator.max_duration,
             malfunction_min_steps=self.world_generator.route_generator.malfunction_generator.min_duration,
             max_soft_deadline=max(c.soft_deadline for c in self.cargo),
@@ -599,15 +616,16 @@ class AirliftEnv(ParallelEnv):
         assert min(s.value for s in PlaneState) >= 0  # Make sure the enum will fit into a Discrete space
 
         cargo_info_space = airliftspaces.NamedTuple(CargoObservation, {'id': Discrete(self._largest_cargo_id),
-                                                            'location': Discrete(self.world_generator.max_airports + 1),
-                                                            'destination': Discrete(
-                                                                self.world_generator.max_airports + 1),
-                                                            'weight': Discrete(10000),
-                                                            'earliest_pickup_time': Discrete(100000),
-                                                            'is_available': Discrete(2),
-                                                            'soft_deadline': Discrete(100000),
-                                                            'hard_deadline': Discrete(100000)
-                                                            })
+                                                                       'location': Discrete(
+                                                                           self.world_generator.max_airports + 1),
+                                                                       'destination': Discrete(
+                                                                           self.world_generator.max_airports + 1),
+                                                                       'weight': Discrete(10000),
+                                                                       'earliest_pickup_time': Discrete(100000),
+                                                                       'is_available': Discrete(2),
+                                                                       'soft_deadline': Discrete(100000),
+                                                                       'hard_deadline': Discrete(100000)
+                                                                       })
 
         scenario_observation = airliftspaces.NamedTuple(ScenarioObservation, {'processing_time': Discrete(1000),
                                                                               'working_capacity': Discrete(1000)})
@@ -620,7 +638,7 @@ class AirliftEnv(ParallelEnv):
                 len(self.world_generator.plane_types)),
             "event_new_cargo": airliftspaces.List(cargo_info_space, self.world_generator.max_cargo_per_episode),
             "agents": gym.spaces.Dict({a: self._agent_space() for a in self.possible_agents}),
-            "scenario_info": airliftspaces.List(scenario_observation,1)
+            "scenario_info": airliftspaces.List(scenario_observation, 1)
         })
 
     def state(self):
@@ -679,14 +697,14 @@ class AirliftEnv(ParallelEnv):
 
     def _build_cargo_obs(self, cargo: Cargo):
         return CargoObservation(
-                         cargo.id,
-                         self._get_cargo_location_ids(cargo),
-                         cargo.end_airport.id,
-                         cargo.weight,
-                         cargo.earliest_pickup_time,
-                         cargo.is_available(self._elapsed_steps),
-                         cargo.soft_deadline,
-                         cargo.hard_deadline)
+            cargo.id,
+            self._get_cargo_location_ids(cargo),
+            cargo.end_airport.id,
+            cargo.weight,
+            cargo.earliest_pickup_time,
+            cargo.is_available(self._elapsed_steps),
+            cargo.soft_deadline,
+            cargo.hard_deadline)
 
     def _build_scen_info_obs(self):
         # These parameters are currently static and do not change throughout a scenario
@@ -716,7 +734,8 @@ class AirliftEnv(ParallelEnv):
             agentstate["current_weight"] = sum(c.weight for c in agentobj.cargo)
             agentstate["max_weight"] = agentobj.plane_type.max_weight
 
-            agentstate["available_routes"] = self.routemap.get_available_routes(agentobj.current_airport, agentobj.plane_type)
+            agentstate["available_routes"] = self.routemap.get_available_routes(agentobj.current_airport,
+                                                                                agentobj.plane_type)
 
             agentstate['next_action'] = self.next_actions[agent]
 
@@ -724,26 +743,28 @@ class AirliftEnv(ParallelEnv):
                 # We can't set these to None - we need to put some value even though they're meaningless while airplane is in flight
                 agentstate["current_airport"] = agentobj.current_airport.id
                 agentstate["cargo_at_current_airport"] = []
-                agentstate["destination"] = agentobj.destination_airport.id if agentobj.destination_airport is not None else NOAIRPORT_ID
+                agentstate[
+                    "destination"] = agentobj.destination_airport.id if agentobj.destination_airport is not None else NOAIRPORT_ID
             else:
                 agentstate["current_airport"] = agentobj.current_airport.id
                 agentstate["cargo_at_current_airport"] = [c.id for c in agentobj.current_airport.cargo]
-                agentstate["destination"] = agentobj.destination_airport.id if agentobj.destination_airport is not None else NOAIRPORT_ID
+                agentstate[
+                    "destination"] = agentobj.destination_airport.id if agentobj.destination_airport is not None else NOAIRPORT_ID
 
             # Update the observation using the agent's values in the state
             self._obs[agent].update(agentstate)
             self._obs[agent]["globalstate"] = self._state
 
-        if TEST_MODE:
-            assert self.state_space().contains(self._state)
-            for agent in self.agents:
-                assert self.observation_space(agent).contains(self._obs[agent])
+    # if TEST_MODE:
+    #   assert self.state_space().contains(self._state)
+    #  for agent in self.agents:
+    #     assert self.observation_space(agent).contains(self._obs[agent])
 
     @property
     @functools.lru_cache(maxsize=None)
     def action_spaces(self) -> Dict[AgentID, Space]:
         sp = gym.spaces.Dict({
-            "process": Discrete(2),
+            "priority": Discrete(NUM_PRIORITIES),
             "cargo_to_load": airliftspaces.List(Discrete(self._largest_cargo_id),
                                                 self.max_cargo_on_airplane),
             "cargo_to_unload": airliftspaces.List(Discrete(self._largest_cargo_id),
@@ -812,7 +833,7 @@ class ActionHelper:
         for a in observation:
             obs = observation[a]
 
-            actions[a] = {"process": self._choice([0, 1]),
+            actions[a] = {"priority": self._choice([i for i in range(NUM_PRIORITIES)]),
                           "cargo_to_load": self._sample_cargo(obs["cargo_at_current_airport"]),
                           "cargo_to_unload": self._sample_cargo(obs["cargo_onboard"]),
                           "destination": self._choice([NOAIRPORT_ID] + list(obs["available_routes"]))}
@@ -854,8 +875,8 @@ class ActionHelper:
             cargo_to_load = [cargo_to_load]
         if isinstance(cargo_to_unload, int):
             cargo_to_unload = [cargo_to_unload]
-        return {"process": 1, "cargo_to_load": cargo_to_load,
-                "cargo_to_unload": cargo_to_unload, "destination": NOAIRPORT_ID}
+        return {"priority": None, "cargo_to_load": cargo_to_load, "cargo_to_unload": cargo_to_unload,
+                "destination": NOAIRPORT_ID}
 
     @staticmethod
     def takeoff_action(destination: int) -> dict:
@@ -866,19 +887,17 @@ class ActionHelper:
         :return: A dictionary containing the destination for the airplane to take off to.
 
         """
-        return {"process": 0, "cargo_to_load": [], "cargo_to_unload": [],
-                "destination": destination}
+        return {"priority": None, "cargo_to_load": [], "cargo_to_unload": [], "destination": destination}
 
     @staticmethod
     def noop_action() -> dict:
         """
-        No-Op Action, "Do nothing"
+        No-Op Action, "Do nothing" (except refuel based on priority)
 
         :return: A dictionary where the values contained will make the airplane take no action.
 
         """
-        return {"process": 0, "cargo_to_load": [], "cargo_to_unload": [],
-                "destination": NOAIRPORT_ID}
+        return {"priority": None, "cargo_to_load": [], "cargo_to_unload": [], "destination": NOAIRPORT_ID}
 
     @staticmethod
     def is_noop_action(action) -> bool:
@@ -889,7 +908,8 @@ class ActionHelper:
         :return: Boolean, True if No-Op action.
 
         """
-        return not action["process"] and \
+        return not action["cargo_to_load"] and \
+               not action["cargo_to_unload"] and \
                action["destination"] == NOAIRPORT_ID
 
     @classmethod
@@ -911,8 +931,8 @@ class ActionHelper:
         if agent_action is None:
             pass
         else:
-            if agent_action["process"] not in [0, 1]:
-                warnings_list.append(ObservationHelper.ObservationWarnings.PROCESS_OUT_OF_BOUNDS)
+            if agent_action["priority"] not in list(range(NUM_PRIORITIES)):
+                warnings_list.append(ObservationHelper.ObservationWarnings.PRIORITY_OUT_OF_BOUNDS)
 
             if agent_action["destination"] not in (
                     [NOAIRPORT_ID] + agent_obs["available_routes"]):
@@ -948,7 +968,7 @@ class ObservationHelper:
 
     # Indicates if the airplane is idle, i.e. it has no action assignment, and the plane is waiting or ready for takeoff.
     @staticmethod
-    def is_airplane_idle(airplane_obs):
+    def needs_orders(airplane_obs):
         """
         Checks to see if an airplane is idle.
 
@@ -956,8 +976,7 @@ class ObservationHelper:
         :return: Returns True if the Airplane is in the Waiting state, or ready for take off and does not have any actions assigned.
 
         """
-        return ActionHelper.is_noop_action(airplane_obs["next_action"]) \
-               and airplane_obs["state"] in [PlaneState.WAITING, PlaneState.READY_FOR_TAKEOFF]
+        return ActionHelper.is_noop_action(airplane_obs["next_action"])
 
     @staticmethod
     def available_destinations(state, airplane_obs, plane_type: PlaneTypeID):
@@ -986,7 +1005,18 @@ class ObservationHelper:
         :return: A list containing the shortest path from airport1 to airport2.
 
         """
-        return nx.shortest_path(state["route_map"][plane_type], airport1, airport2, weight="cost")
+
+        # Changed this to take into account if we pass in the view[a] directly.
+        if not isinstance(state, DiGraph):
+            # If the whole state is passed
+            return nx.shortest_path(state["route_map"][plane_type], airport1, airport2, weight="cost")
+        else:
+            # If the view is passed
+            return nx.shortest_path(state, airport1, airport2, weight="cost")
+
+    @staticmethod
+    def get_all_shorest_path(state, airport1, airport2, plane_type: PlaneTypeID):
+        return nx.all_shortest_paths(state["route_map"][plane_type], airport1, airport2)
 
     @staticmethod
     def get_active_cargo_info(state, cargoid):
@@ -998,11 +1028,22 @@ class ObservationHelper:
         :return: A list containing all the currently active cargo.
 
         """
-        cargo_infos = [ci for ci in state["active_cargo"] if ci.id == cargoid]
-        if cargo_infos:
-            return cargo_infos[0]
+        if cargoid is not None and isinstance(cargoid, list):
+            cargo_infos = [ci for ci in state["active_cargo"] if ci.id in cargoid]
+            if cargo_infos:
+                return cargo_infos
+        elif isinstance(cargoid, int):
+            cargo_infos = [ci for ci in state["active_cargo"] if ci.id == cargoid]
+            if cargo_infos:
+                return cargo_infos[0]
         else:
             return None
+
+
+    @classmethod
+    def get_cargo_objects(cls, state, cargo_list):
+        cargo_infos = [cls.get_active_cargo_info(state, c) for c in cargo_list]
+        return cargo_infos
 
     @classmethod
     def get_cargo_weight(cls, state, cargo_list):
@@ -1028,6 +1069,6 @@ class ObservationHelper:
         UNABLE_TO_LOAD_CARGO = 3
         ATTEMPTING_TO_UNLOAD_CARGO_NOT_ONBOARD = 4
         ATTEMPTING_TO_LOAD_CARGO_NOT_AT_AIRPORT = 5
-        PROCESS_OUT_OF_BOUNDS = 6
+        PRIORITY_OUT_OF_BOUNDS = 6
         AGENT_MAX_WEIGHT_EXCEEDED = 7
         AIRPORT_OUT_OF_BOUNDS = 8

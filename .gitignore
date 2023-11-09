@@ -128,3 +128,5 @@ train_scenarios/
 test_scenarios/
 *.csv
 *.wmv
+
+scores.txt

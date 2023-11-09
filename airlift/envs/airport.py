@@ -1,9 +1,13 @@
 from __future__ import annotations
+
 from typing import Set
 from airlift.envs.world_map import Coordinate
 
 # Avoiding circular imports by importing TYPE_CHECKING for typehints
 from typing import TYPE_CHECKING
+
+from airlift.utils.airplane_queue import AirplaneQueue
+
 if TYPE_CHECKING:
     from airlift.envs.cargo import Cargo
     from airlift.envs.agents import EnvAgent
@@ -23,8 +27,7 @@ class Airport:
         self.cargo: Set[Cargo] = set()
         self.allowed_capacity = working_capacity
         self.agents_processing = set()
-        self.agents_waiting = []
-        self.agents_finished = []
+        self.agents_waiting = AirplaneQueue()
         self.processing_time = processing_time
 
         self.in_drop_off_area = False
@@ -47,6 +50,9 @@ class Airport:
         """
         self.cargo.remove(cargo)
 
+    def add_to_waiting_queue(self, agent: EnvAgent):
+        self.agents_waiting.add_to_waiting_queue(agent)
+
     def add_to_capacity(self, agent: EnvAgent) -> None:
         """
         Adds an agent to the processing queue of an airport if it has capacity available.
@@ -67,7 +73,10 @@ class Airport:
         """
 
         if self.agents_processing:
+            assert agent.processing_time_left == 0
             self.agents_processing.remove(agent)
+            self.agents_waiting.agent_complete(agent)
+            assert agent not in self.agents_processing
 
     def airport_has_capacity(self) -> bool:
         """

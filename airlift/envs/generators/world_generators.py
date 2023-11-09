@@ -57,6 +57,7 @@ class AirliftWorldGenerator(WorldGenerator):
         self._pick_up_area = None
         self._map = None
 
+
     def seed(self, seed=None):
         """
         Upon the initialization of the environment all the generators will be seeded.
@@ -66,6 +67,7 @@ class AirliftWorldGenerator(WorldGenerator):
         self.route_generator.seed(generate_seed(self._np_random))
         self.cargo_generator.seed(generate_seed(self._np_random))
         self.airplane_generator.seed(generate_seed(self._np_random))
+
         self._map = None
         self.airports = None
 
@@ -82,15 +84,20 @@ class AirliftWorldGenerator(WorldGenerator):
         if not self.static_airports or self.airports is None:
             self._airports, self._map, self._drop_off_area, self._pick_up_area = self.airport_generator.generate()
 
-        routemap = RouteMap(self._map, self._airports, self.plane_types, self._drop_off_area, self._pick_up_area)
-        self.route_generator.generate(routemap)
+        route_map = RouteMap(self._map, self._airports, self.plane_types, self._drop_off_area, self._pick_up_area)
 
-        self.cargo_generator.reset(routemap=routemap)
+        self.route_generator.generate(route_map)
+
+        self.cargo_generator.reset(routemap=route_map)
         cargo = self.cargo_generator.generate_initial_orders()
 
-        airplanes = self.airplane_generator.generate(routemap)
+        airplanes = self.airplane_generator.generate(route_map)
 
-        return routemap, \
+        # Seed the RouteMap and the poisson distribution
+        route_map.seed(generate_seed(self._np_random))
+        route_map.poisson_dist.seed(generate_seed(self._np_random))
+
+        return route_map, \
                airplanes, \
                cargo
 

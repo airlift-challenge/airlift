@@ -28,7 +28,6 @@ class PlaneState(IntEnum):
     READY_FOR_TAKEOFF = 3
 
 
-
 class EnvAgent:
     """
     Represents an individual agent (airplane) in an environment.
@@ -39,7 +38,8 @@ class EnvAgent:
                  routemap=None,
                  plane_type=None,
                  max_loaded_weight=None,
-                 malfunction_generator=None):
+                 malfunction_generator=None,
+                 priority=1):
 
         self.flight_cost = 0
         self.flight_start_position: Coordinate = None
@@ -47,6 +47,8 @@ class EnvAgent:
         self.current_airport: Airport = start_airport
         self.routemap: RouteMap = routemap
         self.total_flight_time = None
+
+        self.priority = priority
 
         self.state = PlaneState.READY_FOR_TAKEOFF
 
@@ -68,7 +70,8 @@ class EnvAgent:
 
         self.malfunction_generator = malfunction_generator
 
-    def _handle_waiting(self, action: dict, cargo_by_id: Dict[CargoID, Cargo], elapsed_time, warnings: List[str]) -> None:
+    def _handle_waiting(self, action: dict, cargo_by_id: Dict[CargoID, Cargo], elapsed_time,
+                        warnings: List[str]) -> None:
         """
         Handles trnasitions from the waiting state
 
@@ -78,13 +81,17 @@ class EnvAgent:
         cargo_by_id - Dictionary containing the Cargo and CargoID
         warnings - List of warnings issued by the environment
         """
-        if action["process"]:
-            success = self.try_to_process([cargo_by_id[id] for id in action["cargo_to_load"]],
-                                          [cargo_by_id[id] for id in action["cargo_to_unload"]],
-                                          elapsed_time,
-                                          warnings)
+
+        if action["priority"] != 0:
+
+            # If we haven't added it to the queue yet, add it.
+            self.current_airport.add_to_waiting_queue(self)
+
+            success, warnings = self.try_to_process([cargo_by_id[id] for id in action["cargo_to_load"]],
+                                                    [cargo_by_id[id] for id in action["cargo_to_unload"]],
+                                                    elapsed_time,
+                                                    warnings)
             if success:
-                action["process"] = 0
                 action["cargo_to_load"] = []
                 action["cargo_to_unload"] = []
 
@@ -116,7 +123,8 @@ class EnvAgent:
             self.state = PlaneState.WAITING
             self.elapsed_flight_time = None
 
-    def _handle_ready_for_takeoff(self, action, cargo_by_id: Dict[CargoID, Cargo], elapsed_time, warnings: List[str]) -> None:
+    def _handle_ready_for_takeoff(self, action, cargo_by_id: Dict[CargoID, Cargo], elapsed_time,
+                                  warnings: List[str]) -> None:
         """
         Handles transition when when ready for take off. Checks if routes are reachable from the current airport,
         checks for routes being made unavailable due to malfunctions, gets the flight time and flight cost associated
@@ -129,16 +137,23 @@ class EnvAgent:
         `cargo_by_id` : Dictionary containing the Cargo and CargoID
         `warnings` : List of warnings issued by the environment. Ex: If an action is given to an unavailable route
         """
-        if action["process"]:
-            success = self.try_to_process([cargo_by_id[id] for id in action["cargo_to_load"]],
-                                          [cargo_by_id[id] for id in action["cargo_to_unload"]],
-                                          elapsed_time,
-                                          warnings)
+        if action["cargo_to_load"] or action["cargo_to_unload"]:
+            # The agent has requested a cargo change before taking off - go back to processing state
+
+            # If we haven't added it to the queue yet, add it.
+            self.current_airport.add_to_waiting_queue(self)
+
+            success, warnings = self.try_to_process([cargo_by_id[id] for id in action["cargo_to_load"]],
+                                                    [cargo_by_id[id] for id in action["cargo_to_unload"]],
+                                                    elapsed_time,
+                                                    warnings)
             if success:
-                action["process"] = 0
                 action["cargo_to_load"] = []
                 action["cargo_to_unload"] = []
+
         elif action["destination"] != NOAIRPORT_ID:
+            # We are ready for flight and a destination has been set
+
             new_destination = self.routemap.airports_by_id[action["destination"]]
 
             if not self.routemap.reachable(self.current_airport, self.routemap.airports_by_id[action["destination"]],
@@ -201,11 +216,18 @@ class EnvAgent:
         :return: Tuple containing updated_action and warnings. The updated action contains any updated events to the action dict that occurred during the time step. The warnings list contains any issues with the current actions given.
 
         """
+
         self.last_state = self.state
         warnings: List[str] = []
         updated_action = action.copy()
         updated_action["cargo_to_load"] = self._check_cargo(updated_action["cargo_to_load"], cargo_by_id, warnings)
         updated_action["cargo_to_unload"] = self._check_cargo(updated_action["cargo_to_unload"], cargo_by_id, warnings)
+
+        # Note: While the agent is queued up and waiting for processing, changing the priority will not have an effect on its position in the queue.
+        #       The priority change will only take effect the next time the agent enters the processing queue.
+        if action['priority'] is not None:
+            self.priority = action['priority']
+
 
         if self.state == PlaneState.READY_FOR_TAKEOFF:
             self._handle_ready_for_takeoff(updated_action, cargo_by_id, elapsed_time, warnings)
@@ -234,16 +256,40 @@ class EnvAgent:
 
         """
         success = False
-        if self.current_airport.airport_has_capacity():
+        current_agent = (self.priority, self)
+        next_in_queue = self.current_airport.agents_waiting.peek_at_next()
+
+        if self.current_airport.airport_has_capacity() and current_agent == next_in_queue:
             self.load_cargo(cargo_to_load, elapsed_time, warnings)
             self.unload_cargo(cargo_to_unload, warnings)
-
             self.processing_time_left = self.current_airport.processing_time
             self.current_airport.add_to_capacity(self)
             self.state = PlaneState.PROCESSING
+
+            # Assert successful removal
+            queue_size_before = self.current_airport.agents_waiting.qsize()
+            self.current_airport.agents_waiting.get()
+            assert queue_size_before > self.current_airport.agents_waiting.qsize()
+
             success = True
 
-        return success
+            # Did we properly process the next agent based on their priority
+            assert (current_agent[1] <= next_in_queue[1])
+
+        # Utilize this warnings list
+        elif not self.current_airport.airport_has_capacity():
+            #self.state = PlaneState.WAITING
+            warnings.append("Airport does not have capacity to process!")
+
+        elif current_agent != next_in_queue:
+            self.state = PlaneState.WAITING
+            warnings.append("The agent is not next in queue!")
+
+        elif not self.current_airport.airport_has_capacity() and current_agent != next_in_queue:
+            self.state = PlaneState.WAITING
+            warnings.append("There is no capacity to process and the airplane is not next in queue!")
+
+        return success, warnings
 
     def load_cargo(self, cargo_to_load: Collection[Cargo], elapsed_steps, warnings: List[str]):
         """
@@ -303,3 +349,37 @@ class EnvAgent:
 
         weight = sum(c.weight for c in self.cargo)
         return weight
+
+    # Needed for using PriorityQueue, https://docs.python.org/3/library/queue.html
+    # https://docs.python.org/3/library/heapq.html#module-heapq, O(log n)
+    def __lt__(self, another_agent):
+        if not isinstance(another_agent, EnvAgent):
+            raise TypeError('Can only compare two EnvAgents')
+        if self.priority < another_agent.priority:
+            return True
+        else:
+            return False
+
+    def __gt__(self, another_agent):
+        if not isinstance(another_agent, EnvAgent):
+            raise TypeError("Can only compare two EnvAgents")
+        if self.priority > another_agent.priority:
+            return True
+        else:
+            return False
+
+    def __ge__(self, another_agent):
+        if not isinstance(another_agent, EnvAgent):
+            raise TypeError('Can only compare two EnvAgents')
+        if self.priority >= another_agent.priority:
+            return True
+        else:
+            return False
+
+    def __le__(self, another_agent):
+        if not isinstance(another_agent, EnvAgent):
+            raise TypeError('Can only compare two EnvAgents')
+        if self.priority <= another_agent.priority:
+            return True
+        else:
+            return False

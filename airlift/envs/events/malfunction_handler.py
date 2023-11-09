@@ -30,8 +30,8 @@ class MalfunctionHandler:
             if num_broken_steps > 0:
                 self.malfunction_down_counter = num_broken_steps
                 self.num_malfunctions += 1
-
-        if self.malfunction_down_counter > 0:
+        # Let's avoid adding to the malfunction and decrementing right away. Decrement on the following step call
+        elif self.malfunction_down_counter > 0:
             self.malfunction_down_counter -= 1
 
     def __repr__(self):

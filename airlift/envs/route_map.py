@@ -1,7 +1,12 @@
+import random
 from typing import List, Collection, Set, Dict, Any
 import networkx as nx
+import numpy as np
+from gym.utils import seeding
+
 from airlift.envs.airport import Airport, AirportID
 from airlift.envs.events.event_interval_generator import EventIntervalGenerator
+from airlift.envs.events.poisson_dist_gen import PoissonDistribution
 from airlift.envs.world_map import Map, FlatArea
 from airlift.envs.plane_types import PlaneType, PlaneTypeID
 from airlift.envs.events.malfunction_handler import MalfunctionHandler
@@ -21,6 +26,10 @@ class RouteMap:
 
     def __init__(self, map: Map, airports: List[Airport], plane_types: Collection[PlaneType] = None, drop_off_area=None,
                  pick_up_area=None):
+        self.edges_in_malfunction = []
+        self.poisson_dist = None
+        self.event_generator = None
+        self.previous_edges = None
         self.map = map
         self.graph: Dict[PlaneType, nx.DiGraph] = {}
 
@@ -50,12 +59,17 @@ class RouteMap:
                                        for u, v, d in self.graph[plane].edges(data=True)}
 
         self._multigraph: nx.MultiDiGraph = None
-
         self._malfunction_handlers = []
+        self.all_edges = None
+
+        self._np_random = None
+
+    def set_poisson_params(self, lambda_value):
+        self.poisson_dist = PoissonDistribution(lambda_value)
 
     def __repr__(self):
         return "Graph Data | Distance: " + " | Airplane Type: " + str(self.plane_types) + \
-               " | Graph Information: " + str(self.graph) + " | Memory Address: " + hex(id(self))
+            " | Graph Information: " + str(self.graph) + " | Memory Address: " + hex(id(self))
 
     def airports_by_ids(self, ids: Collection[AirportID]) -> List[Airport]:
         return [self.airports_by_id[id] for id in ids]
@@ -120,7 +134,7 @@ class RouteMap:
         :parameter bidirectional: Boolean, True if route is bidirectional.
 
         """
-
+        self.event_generator = malfunction_generator
         # Use the same handler for both routes so that both go offline at the same time
         handler = MalfunctionHandler(malfunction_generator)
         self._malfunction_handlers.append(handler)
@@ -177,8 +191,43 @@ class RouteMap:
         At each time step the routes are checked for malfunctions. If they are in a malfunction the route will become
         unavailable
         """
-        for mal in self._malfunction_handlers:
-            mal.step()
+        # Generating this here or within the airliftenv probably doesn't make a difference
+        if isinstance(self.event_generator, EventIntervalGenerator):
+            num_events = self.poisson_dist.generate_events()
+            selected_edges = self.select_random_edges_from_graph(num_events)
+
+            # Keep a set of visited edges so that we don't step through bidirectional edges as well.
+            # Both (1,2) and (2,1) have the same MalfunctionHandler object. Bidirectional edges are already taken care of in
+            # the add_route function
+            visited_edges = set()
+            for edge in self._multigraph.edges(data=True):
+                source, target, attributes = edge
+
+                edge_tuple = tuple(sorted((source, target)))
+                route = attributes['mal']
+
+                # 1. Check if the edge is selected and hasn't been visited yet
+                # 2. Or if it hasn't been selected but is in a malfunction and hasn't been visited.
+                # This ensures we step through all edges that we need to place into a malfunction and also decrement
+                # the malfunction down counter in those already offline without doing it twice.
+                if (edge_tuple in selected_edges and edge_tuple not in visited_edges) or \
+                        (route.in_malfunction and edge_tuple not in visited_edges):
+                    route.step()
+
+                    # Add the edge to visited
+                    visited_edges.add(edge_tuple)
+
+    def select_random_edges_from_graph(self, number_of_events):
+
+        if self.all_edges is None:
+            self.all_edges = list(self._multigraph.edges())
+
+        if number_of_events > len(self.all_edges):
+            number_of_events = len(self.all_edges)
+
+        self._np_random.shuffle(self.all_edges)
+        selected_edges = self.all_edges[:number_of_events]
+        return selected_edges
 
     def get_flight_time(self, start: Airport, end: Airport, plane: PlaneType) -> int:
         """
@@ -259,3 +308,6 @@ class RouteMap:
         """
         routes = self.graph[plane_type].adj[source.id]
         return [dest for dest, d in routes.items() if not d['mal'].in_malfunction]
+
+    def seed(self, seed=None):
+        self._np_random, seed = seeding.np_random(seed)

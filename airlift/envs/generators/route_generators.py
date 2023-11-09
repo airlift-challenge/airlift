@@ -18,11 +18,13 @@ from airlift.envs.route_map import RouteMap
 class RouteGenerator:
     def __init__(self,
                  malfunction_generators,
-                 route_ratio=None):  # Ratio of edges to nodes (roughly sets degree of the nodes)
+                 route_ratio=None,
+                 poisson_lambda=0.0):  # Ratio of edges to nodes (roughly sets degree of the nodes)
         # Unique set of event generators - used for seeding.
         # We want a unique set, so that we don't re-seed generators unnecessarily
         self.malfunction_generators: OrderedSet[EventIntervalGenerator] = malfunction_generators
         self.route_ratio: int = route_ratio
+        self.poisson_lambda = poisson_lambda
 
     def seed(self, seed=None):
         self._np_random, seed = seeding.np_random(seed)
@@ -123,10 +125,10 @@ class RouteGenerator:
 class RouteByDistanceGenerator(RouteGenerator):
     def __init__(self,
                  malfunction_generator=NoEventIntervalGen(),
-                 route_ratio=None):
-        super().__init__(OrderedSet([malfunction_generator]), route_ratio)
+                 route_ratio=None, poisson_lambda=0.0,
+                 ):
+        super().__init__(OrderedSet([malfunction_generator]), route_ratio, poisson_lambda=poisson_lambda)
         self.malfunction_generator: EventIntervalGenerator = malfunction_generator
-
     def generate(self, routemap: RouteMap):
         """
         Creates edges based on an airplane models maximum range.
@@ -146,7 +148,7 @@ class RouteByDistanceGenerator(RouteGenerator):
 
         self._add_routes_at_random(routemap, routetuples, bidirectional=True)
         self._connect_components(routemap, self.malfunction_generator)
-
+        routemap.set_poisson_params(self.poisson_lambda)
         assert nx.is_strongly_connected(routemap.multigraph), "Route map is not strongly connected"
 
 
@@ -157,11 +159,14 @@ class LimitedDropoffEntryRouteGenerator(RouteGenerator):
                  malfunction_generator=NoEventIntervalGen(),
                  route_ratio=None,
                  drop_off_fraction_reachable=0,
-                 pick_up_fraction_reachable=0):
+                 pick_up_fraction_reachable=0,
+                 poisson_lambda=0.0):
+
         super().__init__(OrderedSet([malfunction_generator]), route_ratio)
         self.malfunction_generator: EventIntervalGenerator = malfunction_generator
         self.drop_off_fraction_reachable: float = drop_off_fraction_reachable
         self.pick_up_fraction_reachable: float = pick_up_fraction_reachable
+        self.poisson_lambda = poisson_lambda
 
     def generate(self, routemap: RouteMap):
         # Assume there are two plane types with id's 0 and 1
@@ -199,10 +204,9 @@ class LimitedDropoffEntryRouteGenerator(RouteGenerator):
 
         self._add_routes_at_random(routemap, routetuples, bidirectional=True)
         self._connect_components(routemap, self.malfunction_generator)
-
+        routemap.set_poisson_params(self.poisson_lambda)
         assert nx.is_strongly_connected(routemap.multigraph), "Route map is not strongly connected"
 
-        # Note that there may be airports that are not connected to the network (for a specific airplane type) - we will leave these
 
 
 class RouteInfo(NamedTuple):

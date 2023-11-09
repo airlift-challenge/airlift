@@ -1,8 +1,5 @@
 from typing import NamedTuple
-
 from gym.utils import seeding
-from airlift.envs.events.event_generator import EventGenerator
-from airlift.utils.seeds import generate_seed
 
 EventInterval = NamedTuple('EventInterval', [('num_broken_steps', int)])
 
@@ -14,9 +11,7 @@ class EventIntervalGenerator:
     This generator is based upon the Flatland Train Malfunction generator and uses poisson distribution as defined in the
     EventGenerator class.
     """
-    def __init__(self, malfunction_rate: float, min_duration: int, max_duration: int):
-        self.eventgen = EventGenerator(malfunction_rate)
-        self.malfunction_rate = malfunction_rate
+    def __init__(self, min_duration: int, max_duration: int):
         self.min_duration = min_duration
         self.max_duration = max_duration
         self._np_random = None
@@ -24,7 +19,6 @@ class EventIntervalGenerator:
 
     def seed(self, seed=None):
         self._np_random, seed = seeding.np_random(seed)
-        self.eventgen.seed(seed=generate_seed(self._np_random))
 
     def generate(self) -> EventInterval:
         """
@@ -34,12 +28,15 @@ class EventIntervalGenerator:
             steps is 0 of an interval wasn't generated.
 
         """
-        if self.eventgen.generate():
-            if not self._randcache:
-                self._randcache = list(self._np_random.integers(self.min_duration, self.max_duration + 1, size=1000))
+
+        if not self._randcache:
+            self._randcache = list(self._np_random.integers(self.min_duration, self.max_duration, size=1000))
             num_broken_steps = self._randcache.pop() + 1
+
         else:
-            num_broken_steps = 0
+            num_broken_steps = self._randcache.pop() + 1
+
+        # Keep returning the named tuple
         return EventInterval(num_broken_steps)
 
 
@@ -48,4 +45,7 @@ class NoEventIntervalGen(EventIntervalGenerator):
     Used when items that utilize the EventIntervalGenerator are toggled off.
     """
     def __init__(self):
-        super().__init__(0, 0, 0)
+        super().__init__(0, 0)
+
+    def generate(self):
+        return EventInterval(0)
