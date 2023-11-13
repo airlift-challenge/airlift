@@ -154,9 +154,8 @@ class ShortestPath(Solution):
 
     def select_cargo(self, cargo_bins):
         keys_list = list(cargo_bins.keys())
-        random_key_from_list = random.choice(keys_list)
+        random_key_from_list = tuple(self._np_random.choice(keys_list))
         cargo_info = cargo_bins[random_key_from_list]
-
         return random_key_from_list, cargo_info
 
     def get_initial_agent_actions(self, obs, state, dones, pending_cargo, cargo_bins):
