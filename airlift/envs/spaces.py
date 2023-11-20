@@ -110,25 +110,29 @@ class NamedTuple(gym.spaces.Tuple):
 
 
 class DiGraph(Space[nx.DiGraph]):
-    def __init__(self, nnodes: int, attributes: typing.Container[str], dtype=np.int64, seed=None):
+    def __init__(self, nnodes: int, node_attributes: typing.Container[str], edge_attributes: typing.Container[str], dtype=np.int64, seed=None):
         self.nnodes = nnodes
-        self.attributes = attributes
+        self.node_attributes = node_attributes
+        self.edge_attributes = edge_attributes
 
-        super().__init__((nnodes, nnodes, attributes), dtype, seed)
+        # Note the shape is too big. We really need a separate a shape for the edges and nodes.
+        super().__init__((nnodes, nnodes, len(node_attributes) + len(edge_attributes)), dtype, seed)
 
     def contains(self, x) -> bool:
         return type(x) == nx.DiGraph and len(x.nodes) < self.nnodes # Note: it's ok to have fewer nodes in the graph than specified by the space
 
     def __repr__(self):
-        return f"DiGraph({self.nnodes}, {self.attributes})"
+        return f"DiGraph({self.nnodes}, {self.node_attributes}, {self.edge_attributes})"
 
 
 @flatdim.register(DiGraph)
 def _flatdim_digraph(space: DiGraph) -> int:
-    return len(space.attributes) * space.nnodes**2
+    # return len(space.attributes) * space.nnodes**2
+    raise NotImplementedError()
 
 @flatten.register(DiGraph)
 # Entries in the ndarray which are unoccupied will be filled with nan's
 def _flatten_digraph(space: DiGraph, x) -> np.ndarray:
-    return np.concatenate([nx.to_numpy_array(x, weight=a).flatten() for a in space.attributes])
+    # return np.concatenate([nx.to_numpy_array(x, weight=a).flatten() for a in space.attributes])
+    raise NotImplementedError()
 

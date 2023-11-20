@@ -101,7 +101,6 @@ class CargoObservation(NamedTuple):
 
 class ScenarioObservation(NamedTuple):
     processing_time: int
-    working_capacity: int
 
 
 class AirliftEnv(ParallelEnv):
@@ -615,7 +614,8 @@ class AirliftEnv(ParallelEnv):
         route_map = gym.spaces.Dict({})
         for plane in self.world_generator.plane_types:
             route_map[plane.id] = airliftspaces.DiGraph(self.world_generator.max_airports + 1,
-                                                        ["cost", "time", "route_available"])
+                                                        ["working_capacity"],
+                                                        ["cost", "time", "route_available", "mal", "expected_mal_steps"])
 
         assert min(s.value for s in PlaneState) >= 0  # Make sure the enum will fit into a Discrete space
 
@@ -631,8 +631,7 @@ class AirliftEnv(ParallelEnv):
                                                                        'hard_deadline': Discrete(100000)
                                                                        })
 
-        scenario_observation = airliftspaces.NamedTuple(ScenarioObservation, {'processing_time': Discrete(1000),
-                                                                              'working_capacity': Discrete(1000)})
+        scenario_observation = airliftspaces.NamedTuple(ScenarioObservation, {'processing_time': Discrete(1000)})
         return gym.spaces.Dict({
             "route_map": route_map,
             "active_cargo": airliftspaces.List(cargo_info_space, self.world_generator.max_cargo_per_episode),
@@ -714,7 +713,6 @@ class AirliftEnv(ParallelEnv):
         # These parameters are currently static and do not change throughout a scenario
         # If max working_capacity or processing time ever become dynamic. This observation will have to be changed.
         return ScenarioObservation(self.world_generator.airport_generator.processing_time,
-                                   self.world_generator.airport_generator.working_capacity
                                    )
 
     def _update_state_and_obs(self, new_cargo):

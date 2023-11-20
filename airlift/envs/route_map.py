@@ -109,7 +109,7 @@ class RouteMap:
 
         for plane in self.plane_types:
             for airport in self.airports:
-                self.graph[plane].add_node(airport.id, pos=airport.position, airport=airport)
+                self.graph[plane].add_node(airport.id, pos=airport.position, airport=airport, working_capacity=airport.allowed_capacity)
 
         self._multigraph = None
 
