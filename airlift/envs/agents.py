@@ -60,6 +60,8 @@ class EnvAgent:
         self.processing_time_left = 0
         self.cargo: Set[Cargo] = set()
         self.waiting_steps = 0
+        self.waiting_to_process_steps = 0
+        self.waiting_for_route_steps = 0
 
         self.last_direction = None
 
@@ -83,6 +85,7 @@ class EnvAgent:
         """
 
         if action["priority"] != 0:
+            self.waiting_to_process_steps += 1
 
             # If we haven't added it to the queue yet, add it.
             self.current_airport.add_to_waiting_queue(self)
@@ -167,6 +170,7 @@ class EnvAgent:
                                 + str(
                     self.routemap.get_malfunction_time(self.current_airport.id, new_destination.id,
                                                        self.plane_type)) + " steps!")
+                self.waiting_for_route_steps += 1
             else:
                 self.elapsed_flight_time = 0
 
