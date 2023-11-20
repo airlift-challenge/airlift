@@ -141,7 +141,6 @@ class AirliftEnv(ParallelEnv):
 
         self.num_resets = 0
 
-        self.available_capacity = 0
         self.total_rewards = {}
 
         self.cargo_by_id: Dict[CargoID, Cargo] = None
@@ -302,7 +301,6 @@ class AirliftEnv(ParallelEnv):
 
         self.clear_rewards_dict()
         self._elapsed_steps += 1
-        self.available_capacity += self.calculate_available_capacity()
 
         # Not allowed to step further once done
         if all(self.dones.values()):
@@ -470,15 +468,6 @@ class AirliftEnv(ParallelEnv):
 
         if self.renderer is not None:
             self.renderer.close_window()
-
-    def calculate_available_capacity(self):
-        allowed_capacity = 0
-        currently_processing = 0
-        for airport in self.routemap.airports:
-            allowed_capacity += airport.allowed_capacity
-            currently_processing += len(airport.agents_processing)
-
-        return allowed_capacity - currently_processing
 
     @property
     def metrics(self):
