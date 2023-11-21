@@ -39,6 +39,10 @@ class EventIntervalGenerator:
         # Keep returning the named tuple
         return EventInterval(num_broken_steps)
 
+    @property
+    def expected_mal_steps(self):
+        return (self.max_duration - self.min_duration) / 2
+
 
 class NoEventIntervalGen(EventIntervalGenerator):
     """
@@ -49,3 +53,6 @@ class NoEventIntervalGen(EventIntervalGenerator):
 
     def generate(self):
         return EventInterval(0)
+
+    def expected_mal_steps(self):
+        return 0

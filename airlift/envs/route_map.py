@@ -147,7 +147,8 @@ class RouteMap:
             self.graph[plane].add_edge(end.id, start.id, cost=cost,
                                        plane_type=plane.id,
                                        time=time,
-                                       mal=handler)
+                                       mal=handler,
+                                       expected_mal_steps=malfunction_generator.expected_mal_steps)
 
         self._multigraph = None
 
