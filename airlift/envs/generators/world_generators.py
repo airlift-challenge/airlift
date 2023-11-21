@@ -8,6 +8,7 @@ from airlift.envs.generators.cargo_generators import StaticCargoGenerator
 from airlift.envs.generators.airplane_generators import AirplaneGenerator
 from airlift.envs.generators.airport_generators import RandomAirportGenerator
 from airlift.envs.generators.route_generators import RouteByDistanceGenerator
+from airlift.envs.generators.routemap_updater import NoRouteMapUpdater
 from airlift.envs.route_map import RouteMap
 from airlift.utils.seeds import generate_seed
 from airlift.envs.plane_types import PlaneType
@@ -39,6 +40,7 @@ class AirliftWorldGenerator(WorldGenerator):
                  route_generator=RouteByDistanceGenerator(),
                  cargo_generator=StaticCargoGenerator(1),
                  airplane_generator=AirplaneGenerator(1),
+                 routemap_updater=NoRouteMapUpdater(),
                  static_airports=False,
                  max_cycles=10 ** 4):
         super().__init__(max_cycles=max_cycles)
@@ -49,6 +51,10 @@ class AirliftWorldGenerator(WorldGenerator):
         self.cargo_generator = cargo_generator
         self.airplane_generator = airplane_generator
         self.static_airports = static_airports
+
+        if not isinstance(routemap_updater, list):
+            routemap_updater = [routemap_updater]
+        self.routemap_updater = routemap_updater
 
         self._np_random = None
 
@@ -67,7 +73,8 @@ class AirliftWorldGenerator(WorldGenerator):
         self.route_generator.seed(generate_seed(self._np_random))
         self.cargo_generator.seed(generate_seed(self._np_random))
         self.airplane_generator.seed(generate_seed(self._np_random))
-
+        for u in self.routemap_updater:
+            u.seed(generate_seed(self._np_random))
         self._map = None
         self.airports = None
 
@@ -92,6 +99,9 @@ class AirliftWorldGenerator(WorldGenerator):
         cargo = self.cargo_generator.generate_initial_orders()
 
         airplanes = self.airplane_generator.generate(route_map)
+
+        for u in self.routemap_updater:
+            u.update(route_map)
 
         # Seed the RouteMap and the poisson distribution
         route_map.seed(generate_seed(self._np_random))
