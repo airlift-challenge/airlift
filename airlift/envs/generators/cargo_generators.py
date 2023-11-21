@@ -176,10 +176,12 @@ class DynamicCargoGenerator(StaticCargoGenerator):
                  hard_deadline_multiplier=1.5,
                  dynamic_soft_deadline_multiplier=None,
                  dynamic_hard_deadline_multiplier=None,
+                 max_stagger_steps=100,
                  max_weight=1):
         super().__init__(num_of_tasks=num_initial_tasks,
                          soft_deadline_multiplier=soft_deadline_multiplier,
                          hard_deadline_multiplier=hard_deadline_multiplier,
+                         max_stagger_steps=max_stagger_steps,
                          max_weight=max_weight)
 
         if dynamic_soft_deadline_multiplier is None:
