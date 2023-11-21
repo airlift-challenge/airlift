@@ -66,7 +66,7 @@ def gen_env():
                 cargo_creation_rate=1 / 100,
                 max_cargo_to_create=5,
                 num_initial_tasks=5,
-                soft_deadline_multiplier=25,
+                soft_deadline_multiplier=45,
                 hard_deadline_multiplier=50
             ),
             airplane_generator=AirplaneGenerator(20),

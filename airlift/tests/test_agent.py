@@ -17,12 +17,12 @@ from airlift.tests.util import generate_environment
 
 @pytest.fixture
 def env():
-    return generate_environment(num_of_agents=1, cargo_generator=StaticCargoGenerator(1, 100, 150))
+    return generate_environment(num_of_agents=1, cargo_generator=StaticCargoGenerator(1, 100, 150, max_stagger_steps=0),)
 
 
 @pytest.fixture
 def env_with_malfunctions():
-    return generate_environment(num_of_agents=1, cargo_generator=StaticCargoGenerator(1, 100, 150), num_of_airports=3, malfunction_generator=EventIntervalGenerator(min_duration=1, max_duration=2))
+    return generate_environment(num_of_agents=1, cargo_generator=StaticCargoGenerator(1, 100, 150, max_stagger_steps=0), num_of_airports=3, malfunction_generator=EventIntervalGenerator(min_duration=1, max_duration=2))
 
 
 def check_reward(env, a):

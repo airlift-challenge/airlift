@@ -13,7 +13,9 @@ def test_dynamic_cargo(render):
     max_dynamic_cargo = 3
     dynamic_cargo_generator = DynamicCargoGenerator(cargo_creation_rate=1000,
                                                     num_initial_tasks=num_of_tasks,
-                                                    max_cargo_to_create=3)
+                                                    max_cargo_to_create=3,
+                                                    soft_deadline_multiplier=50,
+                                                    hard_deadline_multiplier=100)
     env = generate_environment(num_of_airports=3, num_of_agents=1, cargo_generator=dynamic_cargo_generator)
     env.reset(seed)
     env.step(None)
