@@ -211,7 +211,7 @@ class GridAirportGenerator(AirportGenerator):
                 world_coord = FlatCoordinate((width * edge_pad + ((1 + 2 * col) * self.airport_radius),
                                               height * edge_pad + ((1 + 2 * row) * self.airport_radius)))
 
-                if map.is_land(world_coord):
+                if map.is_land(world_coord) and world_coord not in airport_coords:
                     airport_coords.append(world_coord)
 
         airports = self._generate_airports_from_coords(airport_coords, dropoff_area, pick_up_area)
@@ -338,7 +338,7 @@ class RandomAirportGenerator(AirportGenerator):
                 world_coord = FlatCoordinate((width * (x / map.grid_size[0]),
                                               height * (y / map.grid_size[1])))
 
-                if map.is_land(world_coord):
+                if map.is_land(world_coord) and world_coord not in airport_coords:
                     airport_coords.append(world_coord)
                     successcount += 1
 
@@ -414,7 +414,7 @@ class GridAirportGenerator(AirportGenerator):
                 world_coord = FlatCoordinate((width * edge_pad + ((1 + 2 * col) * self.airport_radius),
                                               height * edge_pad + ((1 + 2 * row) * self.airport_radius)))
 
-                if map.is_land(world_coord):
+                if map.is_land(world_coord) and world_coord not in airport_coords:
                     airport_coords.append(world_coord)
 
         airports = self._generate_airports_from_coords(airport_coords, dropoff_area, pick_up_area)
