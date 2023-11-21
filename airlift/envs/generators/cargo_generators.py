@@ -15,13 +15,14 @@ class CargoGenerator:
     Handles the generation of Cargo Tasks
     """
 
-    def __init__(self, num_initial_tasks, max_cargo_per_episode, max_weight):
+    def __init__(self, num_initial_tasks, max_cargo_per_episode, max_stagger_steps=0, max_weight=1):
         self._np_random = None
         self.routemap = None
         self.num_initial_tasks = num_initial_tasks
         self.max_cargo_per_episode = max_cargo_per_episode
         self.current_cargo_count = 0
         self.max_weight = max_weight
+        self.max_stagger_steps = max_stagger_steps
 
     def reset(self, routemap: RouteMap):
         self.routemap = routemap
