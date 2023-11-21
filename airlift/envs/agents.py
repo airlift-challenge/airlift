@@ -311,7 +311,7 @@ class EnvAgent:
                     "Unable to load Cargo ID: " + str(cargo.id) + " is not at airport")
             elif cargo.earliest_pickup_time > elapsed_steps:
                 time_rem = cargo.earliest_pickup_time - elapsed_steps
-                print(
+                warnings.append(
                     "Unable to load Cargo ID: " + str(cargo.id) +
                     ". The cargo is not ready yet and will be ready in " + str(time_rem) + " steps!")
             else:
