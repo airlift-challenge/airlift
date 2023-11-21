@@ -13,23 +13,21 @@ from airlift.envs.plane_types import PlaneTypeID
 from airlift.envs.airport import AirportID
 from airlift.envs.events.event_interval_generator import NoEventIntervalGen, EventIntervalGenerator
 from airlift.envs.route_map import RouteMap
+from airlift.utils.seeds import generate_seed
 
 
 class RouteGenerator:
     def __init__(self,
-                 malfunction_generators,
+                 malfunction_generator,
                  route_ratio=None,
                  poisson_lambda=0.0):  # Ratio of edges to nodes (roughly sets degree of the nodes)
-        # Unique set of event generators - used for seeding.
-        # We want a unique set, so that we don't re-seed generators unnecessarily
-        self.malfunction_generators: OrderedSet[EventIntervalGenerator] = malfunction_generators
+        self.malfunction_generator = malfunction_generator
         self.route_ratio: int = route_ratio
         self.poisson_lambda = poisson_lambda
 
     def seed(self, seed=None):
         self._np_random, seed = seeding.np_random(seed)
-        for m in self.malfunction_generators:
-            m.seed(seed=seed)
+        self.malfunction_generator.seed(seed=generate_seed(self._np_random))
 
     def generate(self, routemap: RouteMap):
         raise NotImplementedError
@@ -127,8 +125,8 @@ class RouteByDistanceGenerator(RouteGenerator):
                  malfunction_generator=NoEventIntervalGen(),
                  route_ratio=None, poisson_lambda=0.0,
                  ):
-        super().__init__(OrderedSet([malfunction_generator]), route_ratio, poisson_lambda=poisson_lambda)
-        self.malfunction_generator: EventIntervalGenerator = malfunction_generator
+        super().__init__(malfunction_generator, route_ratio, poisson_lambda=poisson_lambda)
+
     def generate(self, routemap: RouteMap):
         """
         Creates edges based on an airplane models maximum range.
@@ -162,8 +160,7 @@ class LimitedDropoffEntryRouteGenerator(RouteGenerator):
                  pick_up_fraction_reachable=0,
                  poisson_lambda=0.0):
 
-        super().__init__(OrderedSet([malfunction_generator]), route_ratio)
-        self.malfunction_generator: EventIntervalGenerator = malfunction_generator
+        super().__init__(malfunction_generator, route_ratio)
         self.drop_off_fraction_reachable: float = drop_off_fraction_reachable
         self.pick_up_fraction_reachable: float = pick_up_fraction_reachable
         self.poisson_lambda = poisson_lambda
