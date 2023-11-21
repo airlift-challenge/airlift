@@ -15,7 +15,7 @@ def test_legal_actions(render):
     env = generate_environment(num_of_airports=num_airports, num_of_agents=1, processing_time=0,
                                malfunction_generator=NoEventIntervalGen(),
                                cargo_generator=StaticCargoGenerator(1, soft_deadline_multiplier=1000,
-                                                                    hard_deadline_multiplier=2000))
+                                                                    hard_deadline_multiplier=2000, max_stagger_steps=0))
     obs = env.reset(seed)
     valid_destination(env, obs)
     valid_priority(env, obs)
