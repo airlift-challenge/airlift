@@ -47,8 +47,7 @@ def unpack_named_tuples(obs):
              hard_deadline=obs['a_0']['globalstate']['active_cargo'][i][7])
     for i in range(len(obs['a_0']['globalstate']['scenario_info'])):
         obs['a_0']['globalstate']['scenario_info'][i] = ScenarioObservation \
-            (processing_time=obs['a_0']['globalstate']['scenario_info'][i][0],
-             working_capacity=obs['a_0']['globalstate']['scenario_info'][i][1])
+            (processing_time=obs['a_0']['globalstate']['scenario_info'][i][0])
     for i in range(len(obs['a_0']['globalstate']['event_new_cargo'])):
         obs['a_0']['globalstate']['event_new_cargo'][i] = CargoObservation \
             (id=obs['a_0']['globalstate']['event_new_cargo'][i][0],
