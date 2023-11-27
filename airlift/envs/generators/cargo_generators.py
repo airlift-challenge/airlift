@@ -42,7 +42,7 @@ class CargoGenerator:
 
     def generate_cargo_weight(self):
         """
-        Generates a random weight for a cargo. At the moment the weight defaults to 1.
+        Generates a random weight for a cargo.
         """
         if self.max_weight > 1:
             return self._np_random.randint(1, self.max_weight)
@@ -56,7 +56,7 @@ class StaticCargoGenerator(CargoGenerator):
     """
 
     def __init__(self, num_of_tasks=1, soft_deadline_multiplier=50, hard_deadline_multiplier=100, max_stagger_steps=100, max_weight=1):
-        super().__init__(num_of_tasks, num_of_tasks, max_weight)
+        super().__init__(num_of_tasks, num_of_tasks, max_weight=max_weight)
 
         self.max_stagger_steps = max_stagger_steps
         self._processing_time = None
