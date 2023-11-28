@@ -738,7 +738,7 @@ class AirliftEnv(ParallelEnv):
                     "destination"] = agentobj.destination_airport.id if agentobj.destination_airport is not None else NOAIRPORT_ID
             else:
                 agentstate["current_airport"] = agentobj.current_airport.id
-                agentstate["cargo_at_current_airport"] = [c.id for c in agentobj.current_airport.cargo]
+                agentstate["cargo_at_current_airport"] = [c.id for c in agentobj.current_airport.cargo if c.is_available(self._elapsed_steps)]
                 agentstate[
                     "destination"] = agentobj.destination_airport.id if agentobj.destination_airport is not None else NOAIRPORT_ID
 
