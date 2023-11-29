@@ -38,7 +38,6 @@ setup(
     entry_points={
         'console_scripts': [
             'airlift-demo=airlift.cli:demo',
-            'airlift-eval-single=airlift.evaluators.eval_solution_single:run_evaluation',
         ],
     },
     install_requires=requirements,
