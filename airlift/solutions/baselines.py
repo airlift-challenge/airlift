@@ -74,8 +74,8 @@ class ShortestPath(Solution):
 
             if oh.needs_orders(obs[a]):
                 actions[a] = {"priority": 1,
-                              "cargo_to_load": set(),
-                              "cargo_to_unload": set(),
+                              "cargo_to_load": [],
+                              "cargo_to_unload": [],
                               "destination": NOAIRPORT_ID}
 
                 if self.path[a]:
@@ -92,7 +92,7 @@ class ShortestPath(Solution):
                     if ca[0].id in obs[a]["cargo_onboard"]:
                         for cargo in ca:
                             if cargo.destination == obs[a]['current_airport'] or len(self.path[a]) == 0:
-                                actions[a]["cargo_to_unload"].add(cargo.id)
+                                actions[a]["cargo_to_unload"].append(cargo.id)
                                 # self.cargo_assignments[a].remove(cargo) <--Breaks things for some reason..
                                 # Just setting it to None seems to fix it, but can't even set it to None outside the loop...
                                 self.cargo_assignments[a] = None
@@ -101,7 +101,7 @@ class ShortestPath(Solution):
                         assert ca[0].destination != obs[a]['current_airport']
                         for cargo in ca:
                             if cargo.id not in self.cargo_delivered[a]:
-                                actions[a]["cargo_to_load"].add(cargo.id)
+                                actions[a]["cargo_to_load"].append(cargo.id)
                                 self.cargo_delivered[a].append(cargo.id)
 
         return actions
