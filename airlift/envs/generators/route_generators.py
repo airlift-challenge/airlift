@@ -220,9 +220,8 @@ class HardcodedRouteGenerator(RouteGenerator):
     Can be utilized to hard code a route between nodes. This class is primarily used for testing purposes.
     """
     def __init__(self, routeinfo):
-        super().__init__(OrderedSet(r.malfunction_generator for r in routeinfo))
+        super().__init__(NoEventIntervalGen())
         self.routeinfo: Collection[RouteInfo] = routeinfo
-        self.malfunction_generator = NoEventIntervalGen()
 
     def generate(self, routemap: RouteMap):
         """Adds edges to nodes based upon the information passed to it using the initializer"""
@@ -234,6 +233,7 @@ class HardcodedRouteGenerator(RouteGenerator):
                                cost=r.cost,
                                malfunction_generator=r.malfunction_generator,
                                bidirectional=True)
+        routemap.set_poisson_params(self.poisson_lambda)
 
         if not nx.is_strongly_connected(routemap.multigraph):
             warnings.warn("Route map is not strongly connected")
