@@ -1,7 +1,7 @@
 """
 This is an implementation of the PriorityQueue https://github.com/python/cpython/blob/3.11/Lib/queue.py for the Airlift Environment
 """
-
+import heapq
 import types
 from collections import deque
 from heapq import heappush, heappop
@@ -170,14 +170,40 @@ class AirplaneQueue(Queue):
         return self.get(block=False)
 
     # Lets avoid iterating comparison of (self.priority, agent) in queue and instead keep track of it using a set()?
-    def add_to_waiting_queue(self, agent):
+    def add_to_waiting_queue(self, agent, count):
         if agent not in self.added_agents:
-            assert (agent.priority, agent) not in self.queue
-            self.put((agent.priority, agent))
+            self.put((agent.priority, count, agent))
             self.added_agents.add(agent)
-
 
     # Once agents are done waiting/processing, they are removed through the airport class
     def agent_complete(self, agent):
         if agent in self.added_agents:
             self.added_agents.remove(agent)
+
+    def is_added_agents_empty(self):
+        if not self.added_agents:
+            return True
+        else:
+            return False
+
+    def update_priority(self, old_priority, new_priority, old_count, airport_counter, agent):
+
+        entry_to_update = (old_priority, old_count, agent)
+        if entry_to_update in self.queue:
+            agent.priority = new_priority
+            new_entry = (new_priority, next(airport_counter), agent)
+            # Add the new entry
+            self.put(new_entry)
+
+            # Remove the old entry
+            self.queue.remove(entry_to_update)
+            current_size = self._qsize()
+            self.unfinished_tasks = current_size
+            heapq.heapify(self.queue)
+
+    def is_agent_in_queue(self, agent):
+        for item in self.queue:
+            if item[2] == agent:
+                return True, item
+            else:
+                return False, None

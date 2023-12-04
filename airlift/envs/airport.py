@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 from typing import Set
 from airlift.envs.world_map import Coordinate
 
@@ -29,7 +30,7 @@ class Airport:
         self.agents_processing = set()
         self.agents_waiting = AirplaneQueue()
         self.processing_time = processing_time
-
+        self.counter = itertools.count()
         self.in_drop_off_area = False
         self.in_pick_up_area = False
 
@@ -51,7 +52,8 @@ class Airport:
         self.cargo.remove(cargo)
 
     def add_to_waiting_queue(self, agent: EnvAgent):
-        self.agents_waiting.add_to_waiting_queue(agent)
+        count = next(self.counter)
+        self.agents_waiting.add_to_waiting_queue(agent, count)
 
     def add_to_capacity(self, agent: EnvAgent) -> None:
         """
@@ -77,6 +79,10 @@ class Airport:
             self.agents_processing.remove(agent)
             self.agents_waiting.agent_complete(agent)
             assert agent not in self.agents_processing
+
+            # If there are no more agents waiting, initialize a new counter
+            if self.agents_waiting.is_added_agents_empty():
+                self.counter = itertools.count()
 
     def airport_has_capacity(self) -> bool:
         """

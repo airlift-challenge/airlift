@@ -93,7 +93,7 @@ class EnvAgent:
             success, warnings = self.try_to_process([cargo_by_id[id] for id in action["cargo_to_load"]],
                                                     [cargo_by_id[id] for id in action["cargo_to_unload"]],
                                                     elapsed_time,
-                                                    warnings)
+                                                    warnings,action)
             if success:
                 action["cargo_to_load"] = []
                 action["cargo_to_unload"] = []
@@ -149,7 +149,7 @@ class EnvAgent:
             success, warnings = self.try_to_process([cargo_by_id[id] for id in action["cargo_to_load"]],
                                                     [cargo_by_id[id] for id in action["cargo_to_unload"]],
                                                     elapsed_time,
-                                                    warnings)
+                                                    warnings, action)
             if success:
                 action["cargo_to_load"] = []
                 action["cargo_to_unload"] = []
@@ -249,7 +249,7 @@ class EnvAgent:
                        cargo_to_load: Collection[Cargo],
                        cargo_to_unload: Collection[Cargo],
                        elapsed_time,
-                       warnings: List[str]) -> bool:
+                       warnings: List[str], action) -> bool:
         """
         Checks to see if the current airport has capacity. If there is capacity the agent will go into
         the PROCESSING state and the processing timer will be updated. The agent is added to the airports capacity.
@@ -259,11 +259,20 @@ class EnvAgent:
         :return: Boolean, if successfully load or unloaded cargo
 
         """
-        success = False
-        current_agent = (self.priority, self)
-        next_in_queue = self.current_airport.agents_waiting.peek_at_next()
 
-        if self.current_airport.airport_has_capacity() and current_agent == next_in_queue:
+        # Check to see if the agent is in the queue
+        check_agent_in_queue, queue_item = self.current_airport.agents_waiting.is_agent_in_queue(self)
+        # If the agent is in the queue and the priority was updated.
+        if check_agent_in_queue and action['priority'] != self.priority:
+            # Update the queue
+            airport_counter = self.current_airport.counter
+            self.current_airport.agents_waiting.update_priority(self.priority, action['priority'], queue_item[1], airport_counter, self)
+
+        success = False
+        next_in_queue = self.current_airport.agents_waiting.peek_at_next()
+        current_agent = self
+        #(prio, count, agent)
+        if self.current_airport.airport_has_capacity() and self == next_in_queue[2]:
             self.load_cargo(cargo_to_load, elapsed_time, warnings)
             self.unload_cargo(cargo_to_unload, warnings)
             self.processing_time_left = self.current_airport.processing_time
@@ -277,19 +286,15 @@ class EnvAgent:
 
             success = True
 
-            # Did we properly process the next agent based on their priority
-            assert (current_agent[1] <= next_in_queue[1])
-
         # Utilize this warnings list
         elif not self.current_airport.airport_has_capacity():
-            #self.state = PlaneState.WAITING
             warnings.append("Airport does not have capacity to process!")
 
-        elif current_agent != next_in_queue:
+        elif current_agent != next_in_queue[2]:
             self.state = PlaneState.WAITING
             warnings.append("The agent is not next in queue!")
 
-        elif not self.current_airport.airport_has_capacity() and current_agent != next_in_queue:
+        elif not self.current_airport.airport_has_capacity() and current_agent != next_in_queue[2]:
             self.state = PlaneState.WAITING
             warnings.append("There is no capacity to process and the airplane is not next in queue!")
 

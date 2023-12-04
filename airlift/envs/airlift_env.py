@@ -824,7 +824,7 @@ class ActionHelper:
         for a in observation:
             obs = observation[a]
 
-            actions[a] = {"priority": self._choice([i for i in range(NUM_PRIORITIES)]),
+            actions[a] = {"priority": 1,
                           "cargo_to_load": self._sample_cargo(obs["cargo_at_current_airport"]),
                           "cargo_to_unload": self._sample_cargo(obs["cargo_onboard"]),
                           "destination": self._choice([NOAIRPORT_ID] + list(obs["available_routes"]))}

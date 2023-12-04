@@ -1,3 +1,4 @@
+import itertools
 import random
 
 import numpy as np
@@ -31,17 +32,20 @@ def test_priority_actions(render):
 def test_agent_priority():
     seed = 42
     random.seed(seed)
-
+    counter = itertools.count()
     pq = AirplaneQueue()
     # Add an initial queue to the pq
     for i in range(1000):
-        pq.put(EnvAgent(start_airport=1, max_loaded_weight=10, priority=random.randint(1, 100)))
+        priority = random.randint(1, 1000)
+        agent = EnvAgent(start_airport=1, max_loaded_weight=10, priority=priority)
+        pq.put((priority, next(counter), agent))
 
     added_agents = 0
     while not pq.empty():
 
         agent = pq.get()
         next_agent = pq.peek_at_next()
+
         if not pq.empty():
             assert next_agent >= agent
 
@@ -50,7 +54,48 @@ def test_agent_priority():
             added_agents += 1
             prob = random.uniform(0, 1)
             if prob > .5:
-                pq.put(EnvAgent(start_airport=1, max_loaded_weight=10, priority=random.randint(1, 100)))
+                priority = random.randint(1, 100)
+                agent = EnvAgent(start_airport=1, max_loaded_weight=10, priority=priority)
+                count = next(counter)
+                pq.put((priority, count, agent))
+
+                # For any added agent, lets randomly update it
+                new_priority = random.randint(1, 100)
+
+                # Update the priority
+                pq.update_priority(priority, new_priority, count, counter, agent)
+
+
+def test_agent_order():
+    random.seed(42)
+    counter = itertools.count()
+    pq = AirplaneQueue()
+
+    priority1_list = []
+    for i in range(100):
+        priority1_list.append(EnvAgent(start_airport=1, max_loaded_weight=10, priority=1))
+
+    priority2_list = []
+    for i in range(100):
+        priority2_list.append(EnvAgent(start_airport=1, max_loaded_weight=10, priority=2))
+
+    random.shuffle(priority1_list)
+    random.shuffle(priority2_list)
+    for a in priority2_list:
+        pq.add_to_waiting_queue(a, next(counter))
+    for a in priority1_list:
+        pq.add_to_waiting_queue(a, next(counter))
+
+    # This is the order that the agents should appear in the priority queue
+    queue_order = priority1_list + priority2_list
+
+    # Go through each queue entry and make sure it is in the order we added it (and according to priority)
+    while not pq.empty():
+        entry = pq.get()
+        agent = entry[2]
+
+        agent2 = queue_order.pop(0)
+        assert agent == agent2
 
 
 def agent_actions(env, obs):
