@@ -336,15 +336,17 @@ class EnvAgent:
         :parameter warnings: List of warnings issued by the environment. Ex: If an action is given to an unavailable route
 
         """
-
         for cargo in cargo_to_unload:
-            if cargo in self.cargo:
+            if cargo not in self.cargo:
+                warnings.append("Unable to unload cargo, ID: {}, AIRPORT: {}" 
+                            .format(cargo.id, self.current_airport.id))
+        for cargo in self.cargo.copy():
+            cargoInUnloadList = cargo in cargo_to_unload
+            if cargo.missed_hardeadline or cargoInUnloadList:
                 self.cargo.remove(cargo)
                 self.cargo_being_unloaded.add(cargo)
                 logger.debug("Airplane Type: " + str(self.plane_type.id) + " delivered cargo!")
-            else:
-                warnings.append("Unable to unload cargo, ID: {}, AIRPORT: {}"
-                                .format(cargo.id, self.current_airport.id))
+
 
     @property
     def current_cargo_weight(self) -> float:
