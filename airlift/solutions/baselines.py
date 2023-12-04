@@ -15,7 +15,7 @@ class RandomAgent(Solution):
         super().reset(obs, observation_spaces, action_spaces, seed)
         self._action_helper = ActionHelper(np_random=self._np_random)
 
-    def policies(self, obs, dones):
+    def policies(self, obs, dones, infos=None):
         return self._action_helper.sample_valid_actions(observation=obs)
 
 
@@ -42,7 +42,7 @@ class ShortestPath(Solution):
         self._full_delivery_paths = {}
         self.cargo_delivered = {a: [] for a in self.agents}
 
-    def policies(self, obs, dones):
+    def policies(self, obs, dones, infos=None):
         actions = {}
         state = self.get_state(obs)
 

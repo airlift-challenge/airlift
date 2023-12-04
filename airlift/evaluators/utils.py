@@ -26,7 +26,7 @@ def doeval(test_folder: Path,
     episode = 0
     observation = True
     while observation:
-        observation, info, status = evaluator.env_create()
+        observation, infos, status = evaluator.env_create()
         dones = evaluator._env.dones
         if status == Status.FINISHED_ALL_SCENARIOS:
             # When evaluation is complete, the evaluator responds false for the observation
@@ -40,9 +40,9 @@ def doeval(test_folder: Path,
         solution.reset(observation, seed=solution_seed)
 
         while True:
-            action = solution.policies(observation, dones)
+            action = solution.policies(observation, dones, infos)
 
-            observation, all_rewards, dones, info = evaluator.env_step(action)
+            observation, all_rewards, dones, infos = evaluator.env_step(action)
             if all(dones.values()):
                 print("Episode {} Done".format(episode))
                 episode += 1
@@ -66,7 +66,7 @@ def doremoteeval(test_folder: Path,
     episode = 0
     observation = True
     while observation:
-        observation, info, status = evaluator.env_create()
+        observation, infos, status = evaluator.env_create()
         if status == Status.FINISHED_ALL_SCENARIOS:
             # When evaluation is complete, the evaluator responds false for the observation
             print("Evaluation Complete")
@@ -81,9 +81,9 @@ def doremoteeval(test_folder: Path,
 
         dones = {a: False for a in observation.keys()} # For the first step assume agents are not done
         while True:
-            action = solution.policies(observation, dones)
+            action = solution.policies(observation, dones, infos)
 
-            observation, all_rewards, dones, info = evaluator.env_step(action)
+            observation, all_rewards, dones, infos = evaluator.env_step(action)
             if all(dones.values()):
                 print("Episode {} Done".format(episode))
                 break

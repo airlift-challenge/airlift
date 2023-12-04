@@ -39,7 +39,7 @@ class Solution:
         self.observation_spaces = observation_spaces
         self.action_spaces = action_spaces
 
-    def policies(self, obs, dones):
+    def policies(self, obs, dones, infos=None):
         """
         The main policy for returning actions for each agent is contained here.
 
