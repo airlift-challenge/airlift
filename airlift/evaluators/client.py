@@ -351,7 +351,7 @@ if __name__ == "__main__":
     episode = 0
     observation = True
     while observation:
-        observation, info, status = evaluator.env_create()
+        observation, infos, status = evaluator.env_create()
         dones = None
         if status == Status.FINISHED_ALL_SCENARIOS:
             # When evaluation is complete, the evaluator responds false for the observation
@@ -366,9 +366,9 @@ if __name__ == "__main__":
         solution.reset(observation, seed=solution_seed)
 
         while True:
-            action = solution.policies(observation, dones)
+            action = solution.policies(observation, dones, infos=infos)
 
-            observation, all_rewards, dones, info = evaluator.env_step(action)
+            observation, all_rewards, dones, infos = evaluator.env_step(action)
             if all(dones.values()):
                 print("Episode Done")
                 break

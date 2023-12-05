@@ -40,7 +40,7 @@ def doeval(test_folder: Path,
         solution.reset(observation, seed=solution_seed)
 
         while True:
-            action = solution.policies(observation, dones, infos)
+            action = solution.policies(observation, dones, infos=infos)
 
             observation, all_rewards, dones, infos = evaluator.env_step(action)
             if all(dones.values()):
@@ -81,7 +81,7 @@ def doremoteeval(test_folder: Path,
 
         dones = {a: False for a in observation.keys()} # For the first step assume agents are not done
         while True:
-            action = solution.policies(observation, dones, infos)
+            action = solution.policies(observation, dones, infos=infos)
 
             observation, all_rewards, dones, infos = evaluator.env_step(action)
             if all(dones.values()):
