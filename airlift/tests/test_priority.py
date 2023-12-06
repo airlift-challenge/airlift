@@ -2,7 +2,7 @@ import itertools
 import random
 
 import numpy as np
-from airlift.envs.agents import EnvAgent
+from airlift.envs.agents import EnvAgent, PlaneState
 from gym.utils import seeding
 from airlift.envs.events.event_interval_generator import NoEventIntervalGen
 from airlift.envs import ActionHelper, ObservationHelper as oh, HardcodedCargoGenerator, NOAIRPORT_ID, CargoInfo, \
@@ -91,12 +91,64 @@ def test_agent_order():
 
     # Go through each queue entry and make sure it is in the order we added it (and according to priority)
     while not pq.empty():
-        entry = pq.get()
-        agent = entry[2]
+        agent = pq.get()
 
         agent2 = queue_order.pop(0)
         assert agent == agent2
 
+def test_agent_step_priority():
+    random.seed(42)
+
+    num_agents = 100
+
+    # Add a bunch of cargo at each of the 3 airports (should be at least one per airplane)
+    cargo_counter = itertools.count()
+    cargo_info = []
+    for _ in range(num_agents):
+        cargo_info.append(CargoInfo(id=next(cargo_counter), source_airport_id=1, end_airport_id=2))
+        cargo_info.append(CargoInfo(id=next(cargo_counter), source_airport_id=2, end_airport_id=3))
+        cargo_info.append(CargoInfo(id=next(cargo_counter), source_airport_id=3, end_airport_id=1))
+    env = generate_environment(num_of_airports=3,
+                               num_of_agents=num_agents,
+                               processing_time=5,
+                               working_capacity=1,
+                               malfunction_generator=NoEventIntervalGen(),
+                               cargo_generator=HardcodedCargoGenerator(cargo_info),
+                               max_cycles=300)
+    obs = env.reset(seed=897)
+    state = obs["a_0"]["globalstate"]
+
+    # For each airport randomly assign a cargo at that airport to each airplane
+    cargo_assignment = {}
+    for airport in [1, 2, 3]:
+        cargo_at_airport = [c for c in state["active_cargo"] if c.location == airport]
+        agents_at_airport = [a for a, o in obs.items() if o["current_airport"] == airport]
+        random.shuffle(cargo_at_airport)
+        random.shuffle(agents_at_airport)
+        for a, c in zip(agents_at_airport, cargo_at_airport):
+            cargo_assignment[a] = c
+
+    _done = False
+    while not _done:
+        actions = {}
+        for a, o in obs.items():
+            c = cargo_assignment[a]
+
+            if oh.needs_orders(o):
+                actions[a] = {"priority": None,
+                              "cargo_to_load": [c.id] if c.id not in o["cargo_onboard"] else [],
+                              "cargo_to_unload": [c.id] if c.id in o["cargo_onboard"] else [],
+                              "destination": NOAIRPORT_ID,
+                              }
+            elif o["state"] == PlaneState.WAITING:
+                if random.choices([True, False], weights=[0.1, 0.9]):
+                    actions[a] = o["next_action"]
+                    actions[a]["priority"] = random.choice([1, 2, 3])
+            else:
+                actions[a] = None
+
+        obs, rewards, dones, _ = env.step(actions)
+        _done = all(dones.values())
 
 def agent_actions(env, obs):
     done = False

@@ -15,7 +15,8 @@ def generate_environment(num_of_airports: int = 5,
                          malfunction_generator=NoEventIntervalGen(),
                          poisson_lambda=0,
                          cargo_generator=StaticCargoGenerator(1),
-                         plane_types=[PlaneType(id=0, model='A0', max_range=2.0, speed=0.1, max_weight=5)]):
+                         plane_types=[PlaneType(id=0, model='A0', max_range=2.0, speed=0.1, max_weight=5)],
+                         max_cycles=10 ** 4):
     return AirliftEnv(
         world_generator=AirliftWorldGenerator(
             plane_types=plane_types,
@@ -29,6 +30,7 @@ def generate_environment(num_of_airports: int = 5,
             route_generator=RouteByDistanceGenerator(malfunction_generator=malfunction_generator, poisson_lambda=poisson_lambda),
             cargo_generator=cargo_generator,
             airplane_generator=AirplaneGenerator(num_of_agents),
+            max_cycles=max_cycles
         ),
         renderer=FlatRenderer(show_routes=False)
     )
