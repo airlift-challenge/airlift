@@ -97,6 +97,10 @@ def test_agent_order():
         assert agent == agent2
 
 def test_agent_step_priority():
+    # This test just keeps the agents where they are and repeatedly loads/unloads a cargo item. The idea is to keep
+    # the agents queued up as much as possible (working capacity is 2, so there will be a long queue).
+    # Meanwhile, the agents will randomly change priority while in queue.
+
     random.seed(42)
 
     num_agents = 100
@@ -111,7 +115,7 @@ def test_agent_step_priority():
     env = generate_environment(num_of_airports=3,
                                num_of_agents=num_agents,
                                processing_time=5,
-                               working_capacity=1,
+                               working_capacity=2,
                                malfunction_generator=NoEventIntervalGen(),
                                cargo_generator=HardcodedCargoGenerator(cargo_info),
                                max_cycles=300)
@@ -135,12 +139,14 @@ def test_agent_step_priority():
             c = cargo_assignment[a]
 
             if oh.needs_orders(o):
+                # If the airplane is idle, assign a new action to go back into processing (loading/unloading its cargo as appropriate)
                 actions[a] = {"priority": None,
                               "cargo_to_load": [c.id] if c.id not in o["cargo_onboard"] else [],
                               "cargo_to_unload": [c.id] if c.id in o["cargo_onboard"] else [],
                               "destination": NOAIRPORT_ID,
                               }
             elif o["state"] == PlaneState.WAITING:
+                # If the agent is in queue, there's a 10% chance that it will randomly change to one of three priorities
                 if random.choices([True, False], weights=[0.1, 0.9]):
                     actions[a] = o["next_action"]
                     actions[a]["priority"] = random.choice([1, 2, 3])
