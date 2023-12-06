@@ -74,6 +74,7 @@ def doepisode(env, solution, render=False, env_seed=None, solution_seed=None, re
     # Run a single episode here
     step = 0
     _done = False
+    infos = None
     obs = env.reset(seed=env_seed)
     if capture_metrics:
         step_metrics = [env.metrics]
@@ -85,9 +86,9 @@ def doepisode(env, solution, render=False, env_seed=None, solution_seed=None, re
     while not _done:
         # Compute Action
         starting_time = timeit.default_timer()
-        actions = solution.policies(env.observe(), env.dones)
+        actions = solution.policies(env.observe(), env.dones, infos=infos)
         total_solution_time += timeit.default_timer() - starting_time
-        obs, rewards, dones, _ = env.step(actions)  # If there is no observation, just return 0
+        obs, rewards, dones, infos = env.step(actions)  # If there is no observation, just return 0
         if capture_metrics:
             step_metrics.append(env.metrics)
 
