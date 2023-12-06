@@ -261,11 +261,12 @@ class EnvAgent:
 
         """
 
-        # Check to see if the agent is in the queue
-        check_agent_in_queue, old_count = self.current_airport.agents_waiting.is_agent_in_queue(self)
-
         # If the agent is in the queue and the priority was updated.
-        if check_agent_in_queue and self.priority != self.old_priority:
+        if self.priority != self.old_priority:
+            # Check to see if the agent is in the queue and get its count - assume it's there (the agent should be in the queue before calling try_to_process)
+            check_agent_in_queue, old_count = self.current_airport.agents_waiting.is_agent_in_queue(self)
+            assert check_agent_in_queue
+
             # Update the queue
             airport_counter = self.current_airport.counter
             self.current_airport.agents_waiting.update_priority(self.old_priority, self.priority, old_count, airport_counter, self)
