@@ -47,7 +47,7 @@ def test_agent_priority():
         next_agent = pq.peek_at_next()
 
         if not pq.empty():
-            assert next_agent >= agent
+            assert agent >= next_agent
 
         # Add agents to the queue during execution
         if added_agents <= 100:

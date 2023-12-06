@@ -367,7 +367,7 @@ class EnvAgent:
     def __lt__(self, another_agent):
         if not isinstance(another_agent, EnvAgent):
             raise TypeError('Can only compare two EnvAgents')
-        if self.priority < another_agent.priority:
+        if self.priority > another_agent.priority:
             return True
         else:
             return False
@@ -375,7 +375,7 @@ class EnvAgent:
     def __gt__(self, another_agent):
         if not isinstance(another_agent, EnvAgent):
             raise TypeError("Can only compare two EnvAgents")
-        if self.priority > another_agent.priority:
+        if self.priority < another_agent.priority:
             return True
         else:
             return False
@@ -383,7 +383,7 @@ class EnvAgent:
     def __ge__(self, another_agent):
         if not isinstance(another_agent, EnvAgent):
             raise TypeError('Can only compare two EnvAgents')
-        if self.priority >= another_agent.priority:
+        if self.priority <= another_agent.priority:
             return True
         else:
             return False
@@ -391,7 +391,7 @@ class EnvAgent:
     def __le__(self, another_agent):
         if not isinstance(another_agent, EnvAgent):
             raise TypeError('Can only compare two EnvAgents')
-        if self.priority <= another_agent.priority:
+        if self.priority >= another_agent.priority:
             return True
         else:
             return False
