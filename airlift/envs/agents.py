@@ -288,6 +288,7 @@ class EnvAgent:
 
         # Utilize this warnings list
         elif not self.current_airport.airport_has_capacity():
+            self.state = PlaneState.WAITING
             warnings.append("Airport does not have capacity to process!")
 
         elif current_agent != next_in_queue[2]:
