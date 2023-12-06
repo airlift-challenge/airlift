@@ -233,6 +233,6 @@ class AirplaneQueue(Queue):
     def is_agent_in_queue(self, agent):
         for item in self.queue:
             if item[2] == agent:
-                return True, item
-            else:
-                return False, None
+                return True, item[1]
+
+        return False, None
