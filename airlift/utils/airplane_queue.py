@@ -145,7 +145,7 @@ class AirplaneQueue(Queue):
         self.added_agents = set()
 
     def peek_at_next(self):
-        return self.queue[0] if self.queue else None
+        return self.queue[0][2] if self.queue else None
 
     def _init(self, maxsize):
         self.queue = []
@@ -157,7 +157,32 @@ class AirplaneQueue(Queue):
         heappush(self.queue, item)
 
     def _get(self):
-        return heappop(self.queue)
+        item = heappop(self.queue)
+
+        # If there are more items in the queue, do a consistency check
+        if self.queue:
+            agent = item[2]
+            priority = item[0]
+            order = item[1]
+
+            next_item = self.queue[0]
+            next_agent = next_item[2]
+            next_priority = next_item[0]
+            next_order = next_item[1]
+
+            # Make sure priority and insertion order are respected when getting next agent
+            assert priority <= next_priority
+            if priority == next_priority:
+                assert order < next_order
+
+            # Make sure priorities stored in the queue match the priorities stored in the agent
+            assert agent.priority == priority
+            assert next_agent.priority == next_priority
+
+            # Make sure the agents themselves are ordered according to their priorities
+            assert agent >= next_agent
+
+        return item[2]
 
     def put_nowait(self, item):
         """Put an item into the queue without blocking.
@@ -172,6 +197,9 @@ class AirplaneQueue(Queue):
     # Lets avoid iterating comparison of (self.priority, agent) in queue and instead keep track of it using a set()?
     def add_to_waiting_queue(self, agent, count):
         if agent not in self.added_agents:
+            # We order queued items first by priority, and then according to insertion order.
+            # (planes having the same priority should be processed in the order they are queued).
+            # heapq's pop retrieves the entry with minimum value - this is consistent with the fact that lower priority numbers should take precedence.
             self.put((agent.priority, count, agent))
             self.added_agents.add(agent)
 
@@ -199,6 +227,7 @@ class AirplaneQueue(Queue):
             self.queue.remove(entry_to_update)
             current_size = self._qsize()
             self.unfinished_tasks = current_size
+            # Make sure the heap is ordered properly after the remove
             heapq.heapify(self.queue)
 
     def is_agent_in_queue(self, agent):
