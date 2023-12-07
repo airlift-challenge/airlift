@@ -105,12 +105,13 @@ class EnvAgent:
         if self.processing_time_left > 0:
             self.processing_time_left -= 1
         else:
-            self.cargo = self.cargo.union(self.cargo_being_loaded)
-            self.cargo_being_loaded = set()
 
             for c in self.cargo_being_unloaded:
                 self.current_airport.add_cargo(c)
             self.cargo_being_unloaded = set()
+
+            self.cargo = self.cargo.union(self.cargo_being_loaded)
+            self.cargo_being_loaded = set()
 
             self.current_airport.remove_from_capacity(self)
             self.state = PlaneState.READY_FOR_TAKEOFF
@@ -274,8 +275,8 @@ class EnvAgent:
         success = False
         next_in_queue = self.current_airport.agents_waiting.peek_at_next()
         if self.current_airport.airport_has_capacity() and self == next_in_queue:
-            self.load_cargo(cargo_to_load, elapsed_time, warnings)
             self.unload_cargo(cargo_to_unload, warnings)
+            self.load_cargo(cargo_to_load, elapsed_time, warnings)
             self.processing_time_left = self.current_airport.processing_time
             self.current_airport.add_to_capacity(self)
             self.state = PlaneState.PROCESSING
