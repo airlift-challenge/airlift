@@ -7,6 +7,7 @@ from airlift.envs.cargo import Cargo, CargoID
 from airlift.envs.world_map import Coordinate
 from airlift.envs.route_map import RouteMap
 from airlift.envs.airport import NOAIRPORT_ID, Airport
+from airlift.utils.definitions import TEST_MODE
 
 AgentID = str
 
@@ -146,7 +147,6 @@ class EnvAgent:
 
             # If we haven't added it to the queue yet, add it.
             self.current_airport.add_to_waiting_queue(self)
-
             success, warnings = self.try_to_process([cargo_by_id[id] for id in action["cargo_to_load"]],
                                                     [cargo_by_id[id] for id in action["cargo_to_unload"]],
                                                     elapsed_time,
@@ -276,6 +276,12 @@ class EnvAgent:
         next_in_queue = self.current_airport.agents_waiting.peek_at_next()
         if self.current_airport.airport_has_capacity() and self == next_in_queue:
             self.unload_cargo(cargo_to_unload, warnings)
+
+            # Test for test_loading_unload.py
+            if TEST_MODE and cargo_to_unload and cargo_to_load:
+                # Assert we unloaded all the cargo we needed to before loading
+                assert cargo_to_unload not in list(self.cargo)
+
             self.load_cargo(cargo_to_load, elapsed_time, warnings)
             self.processing_time_left = self.current_airport.processing_time
             self.current_airport.add_to_capacity(self)

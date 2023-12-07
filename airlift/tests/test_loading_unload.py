@@ -1,4 +1,4 @@
-from airlift.envs import CargoInfo, HardcodedCargoGenerator, NoEventIntervalGen
+from airlift.envs import CargoInfo, HardcodedCargoGenerator, NoEventIntervalGen, PlaneState
 from airlift.solutions.baselines import ShortestPath
 from airlift.tests.util import generate_environment
 
@@ -17,18 +17,17 @@ def test_loading_unloading_order():
                                cargo_generator=HardcodedCargoGenerator(cargo_info),
                                max_cycles=300)
 
-
     _done = False
     solution = ShortestPath()
     obs = env.reset(seed=897)
     solution.reset(obs, seed=4594454)
-
+    unload_action = False
     while not _done:
         # Compute Action
         actions = solution.policies(env.observe(), env.dones)
-        if actions['a_0'] is not None and obs['a_0']['current_airport'] == 1:
-            actions['a_0']['cargo_to_load'] = [3,4]
-            actions['a_0']['cargo_to_unload'] = [1,2]
+        if actions['a_0'] is not None and obs['a_0']['current_airport'] == 1 and not unload_action:
+            actions['a_0']['cargo_to_load'] = [3, 4]
+            actions['a_0']['cargo_to_unload'] = [1, 2]
+            unload_action = True
         obs, rewards, dones, _ = env.step(actions)  # If there is no observation, just return 0
-        print(obs)
         _done = all(dones.values())
