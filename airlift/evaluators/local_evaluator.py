@@ -270,6 +270,9 @@ class LocalEvaluationService:
                 data = "Filename, "
                 for name in zip(self._env.metrics._fields):
                     data += str(name[0]) + ","
+                data += "Simulation Time ,"
+                data += "Normalized Score ,"
+                data += "Simulation Steps"
                 data += "\n"
                 file.write(data)
                 file.close()
@@ -279,6 +282,9 @@ class LocalEvaluationService:
 
             for i in range(len(self._env.metrics)):
                 data += str(self._env.metrics[i]) + ","
+            data += str(self.simulation_times[self.simulation_count]) + ","
+            data += str(self.simulation_scores_normalized[self.simulation_count]) + ","
+            data += str(self.simulation_steps[self.simulation_count])
             data += "\n"
             file.write(data)
             file.close()
