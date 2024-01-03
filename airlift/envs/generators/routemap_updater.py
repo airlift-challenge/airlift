@@ -52,7 +52,7 @@ class VaryCapacityRouteMapUpdater(RouteMapUpdater):
 
         # Update the capacity to 1 in airports that repeat >= count_value
         for airport in airports:
-            airport.allowed_capacity = 1
+            routemap.update_airport_capacity(airport.id, 1)
 
     def seed(self, seed=None):
         self._np_random, seed = seeding.np_random(seed)
@@ -66,7 +66,7 @@ class RandomAirportWorkingCapacities(RouteMapUpdater):
 
     def update(self, routemap):
         for airport in routemap.airports:
-            airport.allowed_capacity = self._np_random.choice(self.working_capacities, size=1, p=self.probs)[0]
+            routemap.update_airport_capacity(airport.id,  self._np_random.choice(self.working_capacities, size=1, p=self.probs)[0])
 
     def seed(self, seed=None):
         self._np_random, seed = seeding.np_random(seed)
