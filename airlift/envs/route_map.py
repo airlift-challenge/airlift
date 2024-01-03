@@ -155,7 +155,12 @@ class RouteMap:
         assert (self.get_flight_cost(start, end, plane) > 0)
         assert (self.get_flight_time(start, end, plane) > 0)
 
-    def draw_graph(self, plane_type_ids_to_draw=None) -> None:
+    def update_airport_capacity(self, airport_id, allowed_capacity):
+        self.airports_by_id[airport_id].allowed_capacity = allowed_capacity
+        for plane in self.plane_types:
+            self.graph[plane].nodes[airport_id]["working_capacity"] = allowed_capacity
+
+    def draw_graph(self, plane_type_ids_to_draw=None, show_cap=False) -> None:
         import matplotlib.pyplot as plt
         EDGECOLORS = ['b', 'r', 'g']
         EDGESTYLES = ['-', ':', '--']
@@ -173,19 +178,29 @@ class RouteMap:
         """
         for plane in plane_types_to_draw:
             pos = nx.get_node_attributes(self.graph[plane], 'pos')
+            cap = nx.get_node_attributes(self.graph[plane], 'working_capacity')
             graph_edge_labels = dict([((u, v,), '{0} ({1})'.format(d['time'], d['cost']))
                                       for u, v, d in self.graph[plane].edges(data=True)])
 
             nx.draw_networkx_edge_labels(self.graph[plane], pos, edge_labels=graph_edge_labels,
                                          label_pos=0.5, font_size=7)
-            nx.draw(self.graph[plane], pos, with_labels=True, edge_color=EDGECOLORS[plane.id],
-                    style=EDGESTYLES[plane.id])
+
+            if show_cap:
+                nx.draw(self.graph[plane], pos, with_labels=True, edge_color=EDGECOLORS[plane.id],
+                        style=EDGESTYLES[plane.id], labels={k: str(v) for k, v in cap.items()})
+            else:
+                nx.draw(self.graph[plane], pos, with_labels=True, edge_color=EDGECOLORS[plane.id],
+                        style=EDGESTYLES[plane.id])
             # position = nx.get_edge_attributes(self._graph[plane.model], "time")
 
         # Change origin to top left
         plt.gca().invert_yaxis()
         plt.show()
         # plt.savefig("./airlift/png/graph.png")
+
+    def get_metrics(self) -> None:
+       cap = [list(nx.get_node_attributes(self.graph[plane], 'working_capacity').values()) for plane in self.plane_types]
+       return min(min(cap)), max(max(cap))
 
     def step(self):
         """
