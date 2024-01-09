@@ -102,18 +102,19 @@ def doeval_single_episode(
            solution_seed: int = 123,
            render=False,
            render_sleep_time=0.1,
-           render_mode="human"):
+           render_mode="human",
+           capture_step_metrics=False):
     env = AirliftEnv.load(test_pkl_file)
-    env_info, metrics, time_taken, total_solution_time, step_metrics = \
+    return \
         doepisode(env,
                   solution=solution,
                   render=render,
                   env_seed=env_seed,
                   solution_seed=solution_seed,
                   render_sleep_time=render_sleep_time,
-                  capture_metrics=True,
+                  capture_metrics=capture_step_metrics,
                   render_mode=render_mode)
-    return env_info, metrics, time_taken, total_solution_time, step_metrics
+
 
 
 class ScenarioInfo(NamedTuple):
