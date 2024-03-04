@@ -116,6 +116,7 @@ class EnvAgent:
 
             self.current_airport.remove_from_capacity(self)
             self.state = PlaneState.READY_FOR_TAKEOFF
+            assert (self.current_cargo_weight <= self.max_loaded_weight)
 
     def _handle_moving(self) -> None:
         """
@@ -318,7 +319,7 @@ class EnvAgent:
         :parameter warnings: List of warnings issued by the environment. Ex: If an action is given to an unavailable route
 
         """
-
+        total_loaded = 0
         for cargo in cargo_to_load:
             if cargo not in self.current_airport.cargo:
                 warnings.append(
@@ -329,9 +330,12 @@ class EnvAgent:
                     "Unable to load Cargo ID: " + str(cargo.id) +
                     ". The cargo is not ready yet and will be ready in " + str(time_rem) + " steps!")
             else:
-                if (cargo.weight + self.current_cargo_weight) <= self.max_loaded_weight:
+                if (cargo.weight + total_loaded + self.current_cargo_weight) <= self.max_loaded_weight:
+                    # Increment total loaded weight for this iteration
+                    total_loaded += cargo.weight
                     self.current_airport.remove_cargo(cargo)
                     self.cargo_being_loaded.add(cargo)
+
                 else:
                     warnings.append(
                         "Unable to load Cargo ID: " + str(cargo.id) + " due to exceeding allowed airplane weight limit")

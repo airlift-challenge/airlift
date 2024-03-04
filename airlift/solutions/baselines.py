@@ -214,11 +214,8 @@ class ShortestPath(Solution):
                                     num_cargo_assigned += 1
                                     cargo_info.remove(cargo)
 
-                                    # Ideally break out of this loop right as we reach the max airplane weight. but I've
-                                    # been getting better results just assigning all of them.
                                     if num_cargo_assigned == max_airplane_weight:
-                                        continue
-                                    # break
+                                     break
 
                                 # Delete the key value if there are no more cargo in this bin, so we don't select it anymore
                                 # during the next iteration
